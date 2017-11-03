@@ -8,11 +8,14 @@ set(OKVIS_PATCH_VERSION 3)
 set(OKVIS_VERSION
   ${OKVIS_MAJOR_VERSION}.${OKVIS_MINOR_VERSION}.${OKVIS_PATCH_VERSION})
 
+set(CMAKE_BUILD_TYPE Release)
+
+
 # options for build configuration
 option (USE_SYSTEM_BRISK
-        "Use brisk via find_package rather than downloading it as part of okvis" OFF) 
+        "Use brisk via find_package rather than downloading it as part of okvis" ON) 
 option (USE_SYSTEM_CERES
-        "Use ceres via find_package rather than downloading it as part of okvis" OFF) 
+        "Use ceres via find_package rather than downloading it as part of okvis" ON) 
 option (BUILD_APPS
         "Builds a demo app (which requires boost)" ON) 
 option (BUILD_TESTS
@@ -81,7 +84,10 @@ link_directories(${CMAKE_BINARY_DIR}/lib)
 
 # require Eigen
 find_package( Eigen REQUIRED )
-include_directories(${EIGEN_INCLUDE_DIR}) 
+include_directories($ENV{EIGEN_INCLUDE_DIR}) 
+SET( EIGEN_INCLUDE_DIRS "$ENV{EIGEN_INCLUDE_DIR}" )
+SET( EIGEN_INCLUDE_DIR "$ENV{EIGEN_INCLUDE_DIR}" )
+
 
 # libvisensor
 find_package(VISensor)
@@ -191,10 +197,10 @@ else()
   if (OPENMP_FOUND)
     message(STATUS "OpenMP found")
     add_definitions(-DUSE_OPENMP)
-    set(CERES_LIBRARIES ceres gomp ${SUITESPARSE_LIBRARIES} ${CXSPARSE_LIBRARIES} ${Eigen_LIBS} ${GLOG_LIBRARY}) #ceres won't export these
+    set(CERES_LIBRARIES ceres gomp ${SUITESPARSE_LIBRARIES} ${Eigen_LIBS} ${GLOG_LIBRARY}) #ceres won't export these
   else ()
     message(STATUS "OpenMP NOT found")
-    set(CERES_LIBRARIES ceres ${SUITESPARSE_LIBRARIES} ${CXSPARSE_LIBRARIES}  ${Eigen_LIBS} ${GLOG_LIBRARY}) #ceres won't export these
+    set(CERES_LIBRARIES ceres ${SUITESPARSE_LIBRARIES} ${Eigen_LIBS} ${GLOG_LIBRARY}) #ceres won't export these
   endif ()
   add_dependencies(${CERES_LIBRARIES} ceres_external)
 
@@ -208,40 +214,48 @@ else()
 endif()
 
 # OpenGV
-set(CMAKE_CXX_FLAGS_WSUPPRESS 
-      "${CMAKE_CXX_FLAGS} -Wno-unused-parameter -Wno-maybe-uninitialized -Wno-sign-compare -Wno-unused-but-set-variable -Wno-unused-variable -Wno-pedantic")
-message(STATUS "NOTE: Suppressing some warnings when compiling OpenGV.")
-ExternalProject_Add(opengv_external
-    GIT_REPOSITORY https://github.com/laurentkneip/opengv
-    GIT_TAG cc32b16281aa6eab67cb28a61cf87a2a5c2b0961
-    UPDATE_COMMAND ""
-    PATCH_COMMAND # forcing static libs
-        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/cmake/opengv/CMakeLists.txt ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv/CMakeLists.txt
-        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/cmake/opengv/opengvConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv/opengvConfig.cmake.in
-        COMMENT "Forcing our own CMakeLists.txt to build OpenGV (static library support)."
-    CMAKE_ARGS 
-      -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR> 
-      -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE} 
-      -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_WSUPPRESS} # suppress warnings...
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/opengv
-    SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv
-    INSTALL_DIR ${CMAKE_BINARY_DIR}
-    BUILD_IN_SOURCE 0
-    BUILD_COMMAND make -j${N_CORES}
-    INSTALL_COMMAND make install
-)
-add_library(opengv STATIC IMPORTED)
-set(OpenGV_LIBRARIES opengv)
-set_target_properties(opengv PROPERTIES IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/libopengv.a)
-add_dependencies(${OpenGV_LIBRARIES} opengv_external)
+#set(CMAKE_CXX_FLAGS_WSUPPRESS 
+#      "${CMAKE_CXX_FLAGS} -Wno-unused-parameter -Wno-maybe-uninitialized -Wno-sign-compare -Wno-unused-but-set-variable -Wno-unused-variable -Wno-pedantic")
+#message(STATUS "NOTE: Suppressing some warnings when compiling OpenGV.")
+#ExternalProject_Add(opengv_external
+#    GIT_REPOSITORY https://github.com/laurentkneip/opengv
+#    GIT_TAG cc32b16281aa6eab67cb28a61cf87a2a5c2b0961
+#    UPDATE_COMMAND ""
+#    PATCH_COMMAND # forcing static libs
+#        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/cmake/opengv/CMakeLists.txt ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv/CMakeLists.txt
+ #       COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/cmake/opengv/opengvConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv/opengvConfig.cmake.in
+ #       COMMENT "Forcing our own CMakeLists.txt to build OpenGV (static library support)."
+ #   CMAKE_ARGS 
+ #     -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR> 
+ #     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE} 
+ #     -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS_WSUPPRESS} # suppress warnings...
+ #   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/opengv
+ #   SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv
+ #   INSTALL_DIR ${CMAKE_BINARY_DIR}
+ #   BUILD_IN_SOURCE 0
+ #   BUILD_COMMAND make -j${N_CORES}
+ #   INSTALL_COMMAND make install
+#)
+#add_library(opengv STATIC IMPORTED)
+#set(OpenGV_LIBRARIES opengv)
+#set_target_properties(opengv PROPERTIES IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/libopengv.a)
+#add_dependencies(${OpenGV_LIBRARIES} opengv_external)
+find_package(OpenGV REQUIRED)
+include_directories(${OPENGV_INCLUDE_DIR})
+IF(OPENGV_FOUND)
+   MESSAGE(STATUS "Found OpenGV: ${OPENGV_LIBS}")
+ENDIF(OPENGV_FOUND)
+
+
+find_package(Threads REQUIRED)
 
 # install it once built
-install(FILES ${CMAKE_BINARY_DIR}/lib/libopengv.a 
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(DIRECTORY ${CMAKE_BINARY_DIR}/include/opengv/ 
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/opengv/)
-install(DIRECTORY ${CMAKE_BINARY_DIR}/lib/CMake/opengv/
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/CMake/opengv/)
+#install(FILES ${CMAKE_BINARY_DIR}/lib/libopengv.a 
+#  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+#install(DIRECTORY ${CMAKE_BINARY_DIR}/include/opengv/ 
+#  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/opengv/)
+#install(DIRECTORY ${CMAKE_BINARY_DIR}/lib/CMake/opengv/
+#  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/CMake/opengv/)
 
 if(${BUILD_TESTS})
   # gmock
@@ -306,7 +320,7 @@ add_dependencies(okvis_matcher okvis_util)
 
 include_directories(okvis_frontend/include)
 add_subdirectory(okvis_frontend)
-add_dependencies(okvis_frontend opengv okvis_util)
+add_dependencies(okvis_frontend okvis_util)
 
 include_directories(okvis_multisensor_processing/include)
 add_subdirectory(okvis_multisensor_processing)
@@ -314,8 +328,15 @@ add_dependencies(okvis_multisensor_processing okvis_util)
 
 # also build the apps
 if(BUILD_APPS)
-  FIND_PACKAGE(Boost COMPONENTS filesystem system REQUIRED)
-  include_directories(${Boost_INCLUDE_DIRS}) 
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC ON)
+  set(Boost_USE_MULTITHREAD )
+  FIND_PACKAGE(Boost REQUIRED COMPONENTS chrono date_time filesystem system)
+  include_directories(${Boost_INCLUDE_DIR}) 
+  IF(Boost_FOUND)
+    MESSAGE(STATUS "Found Boost: ${Boost_LIBRARIES}")
+  ENDIF(Boost_FOUND)
+
   add_executable(okvis_app_synchronous okvis_apps/src/okvis_app_synchronous.cpp)
   target_link_libraries(okvis_app_synchronous 
     okvis_util
@@ -328,8 +349,10 @@ if(BUILD_APPS)
     okvis_matcher
     okvis_frontend 
     okvis_multisensor_processing
-    pthread 
     ${Boost_LIBRARIES}
+    ${OPENGV_LIBS}
+    #C:/Boost/lib/libboost_date_time-vc120-mt-gd-1_55.lib
+    #${BRISK_LIBRARIES}
   )
   if(${VISENSORDRIVER_FOUND})
     target_link_libraries(okvis_app_synchronous ${VISensorDriver_LIBRARY})

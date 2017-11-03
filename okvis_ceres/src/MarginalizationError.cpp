@@ -42,6 +42,9 @@
 #include <okvis/ceres/LocalParamizationAdditionalInterfaces.hpp>
 #include <okvis/assert_macros.hpp>
 
+#undef min
+#undef max
+
 //#define USE_NEW_LINEARIZATION_POINT
 
 /// \brief okvis Main namespace of this package.

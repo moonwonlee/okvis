@@ -15,6 +15,9 @@
 # Copyright (c) 2009 Benoit Jacob <jacob.benoit.1@gmail.com>
 # Redistribution and use is allowed according to the terms of the 2-clause BSD license.
 
+set(EIGEN_INCLUDE_DIRS $ENV{EIGEN_INCLUDE_DIR})
+set(EIGEN_INCLUDE_DIR $ENV{EIGEN_INCLUDE_DIR})
+
 if(NOT Eigen_FIND_VERSION)
   if(NOT Eigen_FIND_VERSION_MAJOR)
     set(Eigen_FIND_VERSION_MAJOR 2)
@@ -61,19 +64,19 @@ if (EIGEN_INCLUDE_DIRS)
 
 else ()
 
-  find_path(EIGEN_INCLUDE_DIR NAMES signature_of_eigen3_matrix_library
-      PATHS
-      ${CMAKE_INSTALL_PREFIX}/include
-      ${KDE4_INCLUDE_DIR}
-      PATH_SUFFIXES eigen3 eigen
-    )
+  #find_path(EIGEN_INCLUDE_DIR NAMES signature_of_eigen3_matrix_library
+  #    PATHS
+  #    ${CMAKE_INSTALL_PREFIX}/include
+  #    ${KDE4_INCLUDE_DIR}
+  #    PATH_SUFFIXES eigen3 eigen
+  #  )
 
   if(EIGEN_INCLUDE_DIR)
     _eigen3_check_version()
   endif(EIGEN_INCLUDE_DIR)
 
-  include(FindPackageHandleStandardArgs)
-  find_package_handle_standard_args(Eigen DEFAULT_MSG EIGEN_INCLUDE_DIR EIGEN_VERSION_OK)
+  #include(FindPackageHandleStandardArgs)
+  #find_package_handle_standard_args(Eigen DEFAULT_MSG EIGEN_INCLUDE_DIR EIGEN_VERSION_OK)
 
   mark_as_advanced(EIGEN_INCLUDE_DIR)
   SET(EIGEN_INCLUDE_DIRS ${EIGEN_INCLUDE_DIR} CACHE PATH "The Eigen include path.")

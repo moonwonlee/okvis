@@ -42,10 +42,14 @@
 #define INCLUDE_OKVIS_THREADSAFE_THREADSAFEQUEUE_HPP_
 
 #include <atomic>
-#include <pthread.h>
+//#include <pthread.h>
 #include <queue>
 #include <string>
-#include <sys/time.h>
+//#include <sys/time.h>
+#include <thread>             
+#include <mutex>
+#include <chrono>              
+#include <condition_variable>
 
 #include <glog/logging.h>
 
@@ -79,25 +83,19 @@ class ThreadSafeQueue {
 
   /// \brief Notify all waiting threads. Only used in destructor and when shutting down.
   virtual void NotifyAll() const final {
-    pthread_cond_broadcast(&condition_empty_);
-    pthread_cond_broadcast(&condition_full_);
+    condition_empty_.notify_all();
+    condition_full_.notify_all();
   }
 
   /// \brief Constructor.
   ThreadSafeQueue() {
     shutdown_ = false;
-    pthread_mutex_init(&mutex_, NULL);
-    pthread_cond_init(&condition_empty_, NULL);
-    pthread_cond_init(&condition_full_, NULL);
   }
 
   /// \brief Destructor.
   virtual ~ThreadSafeQueue() {
     shutdown_ = true;
     NotifyAll();
-    pthread_mutex_destroy(&mutex_);
-    pthread_cond_destroy(&condition_empty_);
-    pthread_cond_destroy(&condition_full_);
   }
 
   /// \brief Tell the queue shut down. This will notify all threads to wake up.
@@ -119,25 +117,22 @@ class ThreadSafeQueue {
 
   /// \brief Push to the queue.
   void PushNonBlocking(const QueueType& value) {
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     queue_.push(value);
-    pthread_cond_signal(&condition_empty_);  // Signal that data is available.
-    pthread_mutex_unlock(&mutex_);
+    condition_empty_.notify_one();  // Signal that data is available.
   }
 
   /// \brief Return the size of the queue.
   virtual size_t Size() const final {
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     size_t size = queue_.size();
-    pthread_mutex_unlock(&mutex_);
     return size;
   }
 
   /// \brief Return true if the queue is empty.
   virtual bool Empty() const final {
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     bool empty = queue_.empty();
-    pthread_mutex_unlock(&mutex_);
     return empty;
   }
 
@@ -147,18 +142,16 @@ class ThreadSafeQueue {
   /// \return False if shutdown is requested.
   bool PushBlockingIfFull(const QueueType& value, size_t max_queue_size) {
     while (!shutdown_) {
-      pthread_mutex_lock(&mutex_);
+      std::unique_lock<std::mutex> lck (mutex_);
       size_t size = queue_.size();
       if (size >= max_queue_size) {
-        pthread_cond_wait(&condition_full_, &mutex_);
+        condition_full_.wait(lck);
       }
       if (size >= max_queue_size) {
-        pthread_mutex_unlock(&mutex_);
         continue;
       }
       queue_.push(value);
-      pthread_cond_signal(&condition_empty_);  // Signal that data is available.
-      pthread_mutex_unlock(&mutex_);
+      condition_empty_.notify_one();  // Signal that data is available.
       return true;
     }
     return false;
@@ -170,15 +163,14 @@ class ThreadSafeQueue {
   /// \return True if oldest was dropped because queue was full.
   bool PushNonBlockingDroppingIfFull(const QueueType& value,
                                      size_t max_queue_size) {
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     bool result = false;
     if (queue_.size() >= max_queue_size) {
       queue_.pop();
       result = true;
     }
     queue_.push(value);
-    pthread_cond_signal(&condition_empty_);  // Signal that data is available.
-    pthread_mutex_unlock(&mutex_);
+    condition_empty_.notify_one();  // Signal that data is available.
     return result;
   }
 
@@ -199,18 +191,16 @@ class ThreadSafeQueue {
   bool PopBlocking(QueueType* value) {
     CHECK_NOTNULL(value);
     while (!shutdown_) {
-      pthread_mutex_lock(&mutex_);
+      std::unique_lock<std::mutex> lck (mutex_);
       if (queue_.empty()) {
-        pthread_cond_wait(&condition_empty_, &mutex_);
+        condition_empty_.wait(lck);
       }
       if (queue_.empty()) {
-        pthread_mutex_unlock(&mutex_);
         continue;
       }
       QueueType _value = queue_.front();
       queue_.pop();
-      pthread_cond_signal(&condition_full_);  // Notify that space is available.
-      pthread_mutex_unlock(&mutex_);
+      condition_full_.notify_one();  // Notify that space is available.
       *value = _value;
       return true;
     }
@@ -224,14 +214,12 @@ class ThreadSafeQueue {
    */
   bool PopNonBlocking(QueueType* value) {
     CHECK_NOTNULL(value);
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     if (queue_.empty()) {
-      pthread_mutex_unlock(&mutex_);
       return false;
     }
     *value = queue_.front();
     queue_.pop();
-    pthread_mutex_unlock(&mutex_);
     return true;
   }
 
@@ -246,23 +234,21 @@ class ThreadSafeQueue {
    */
   bool PopTimeout(QueueType* value, int64_t timeout_nanoseconds) {
     CHECK_NOTNULL(value);
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     if (queue_.empty()) {
-      struct timeval tv;
-      struct timespec ts;
-      gettimeofday(&tv, NULL);
-      ts.tv_sec = tv.tv_sec;
-      ts.tv_nsec = tv.tv_usec * 1e3 + timeout_nanoseconds;
-      pthread_cond_timedwait(&condition_empty_, &mutex_, &ts);
+      //struct timeval tv;
+      //struct timespec ts;
+      //gettimeofday(&tv, NULL);
+      //ts.tv_sec = tv.tv_sec;
+      //ts.tv_nsec = tv.tv_usec * 1e3 + timeout_nanoseconds;
+      condition_empty_.wait_for(lck, std::chrono::ns(timeout_nanoseconds));
     }
     if (queue_.empty()) {
-      pthread_mutex_unlock(&mutex_);
       return false;
     }
     QueueType _value = queue_.front();
     queue_.pop();
-    pthread_cond_signal(&condition_full_);  // Notify that space is available.
-    pthread_mutex_unlock(&mutex_);
+    condition_full_.notify_one();  // Notify that space is available.
     *value = _value;
     return true;
   }
@@ -276,14 +262,12 @@ class ThreadSafeQueue {
    */
   bool getCopyOfFront(QueueType* value) {
     CHECK_NOTNULL(value);
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     if (queue_.empty()) {
-      pthread_mutex_unlock(&mutex_);
       return false;
     }
     // COPY the value.
     *value = queue_.front();
-    pthread_mutex_unlock(&mutex_);
     return true;
   }
 
@@ -296,16 +280,14 @@ class ThreadSafeQueue {
   bool getCopyOfFrontBlocking(QueueType* value) {
     CHECK_NOTNULL(value);
     while (!shutdown_) {
-      pthread_mutex_lock(&mutex_);
+      std::unique_lock<std::mutex> lck (mutex_);
       if (queue_.empty()) {
-        pthread_cond_wait(&condition_empty_, &mutex_);
+        condition_empty_.wait(lck);
       }
       if (queue_.empty()) {
-        pthread_mutex_unlock(&mutex_);
         continue;
       }
       *value = queue_.front();
-      pthread_mutex_unlock(&mutex_);
       return true;
     }
     return false;
@@ -320,21 +302,19 @@ class ThreadSafeQueue {
    */
   bool getCopyOfBack(QueueType* value) {
     CHECK_NOTNULL(value);
-    pthread_mutex_lock(&mutex_);
+    std::unique_lock<std::mutex> lck (mutex_);
     if (queue_.empty()) {
-      pthread_mutex_unlock(&mutex_);
       return false;
     }
     // COPY the value.
     *value = queue_.back();
-    pthread_mutex_unlock(&mutex_);
     return true;
   }
 
 
-  mutable pthread_mutex_t mutex_;           ///< The queue mutex.
-  mutable pthread_cond_t condition_empty_;  ///< Condition variable to wait and signal that queue is not empty.
-  mutable pthread_cond_t condition_full_;   ///< Condition variable to wait and signal when an element is popped.
+  mutable std::mutex mutex_;           ///< The queue mutex.
+  mutable std::condition_variable condition_empty_;  ///< Condition variable to wait and signal that queue is not empty.
+  mutable std::condition_variable condition_full_;   ///< Condition variable to wait and signal when an element is popped.
   std::queue<QueueType> queue_;             ///< Actual queue.
   std::atomic_bool shutdown_;               ///< Flag if shutdown is requested.
 

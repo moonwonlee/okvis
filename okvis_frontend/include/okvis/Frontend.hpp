@@ -42,11 +42,15 @@
 #define INCLUDE_OKVIS_FRONTEND_HPP_
 
 #include <mutex>
+#include <boost/filesystem/config.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/Estimator.hpp>
 #include <okvis/VioFrontendInterface.hpp>
 #include <okvis/timing/Timer.hpp>
 #include <okvis/DenseMatcher.hpp>
+
+#undef min
+#undef max
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {

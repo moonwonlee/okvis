@@ -14,6 +14,12 @@ message(STATUS ${CMAKE_CURRENT_BINARY_DIR}/okvisConfig.hpp)
 find_package( Eigen REQUIRED )
 include_directories(${EIGEN_INCLUDE_DIR}) 
 
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC ON)
+  set(Boost_USE_MULTITHREAD )
+  FIND_PACKAGE(Boost REQUIRED COMPONENTS date_time filesystem system)
+  include_directories(${Boost_INCLUDE_DIRS}) 
+
 # require OpenCV
 find_package( OpenCV COMPONENTS core highgui imgproc features2d REQUIRED )
 include_directories(BEFORE ${OpenCV_INCLUDE_DIRS}) 
@@ -42,6 +48,7 @@ target_link_libraries(${PROJECT_NAME}
    PUBLIC okvis_ceres 
    PUBLIC okvis_frontend
    PRIVATE ${GLOG_LIBRARIES}
+   #PRIVATE ${Boost_LIBRARIES}
 )
 
 # export config

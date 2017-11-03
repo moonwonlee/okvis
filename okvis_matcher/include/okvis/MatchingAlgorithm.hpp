@@ -49,6 +49,9 @@
 #include <map>
 #include <memory>
 
+#undef min
+#undef max
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

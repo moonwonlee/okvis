@@ -48,6 +48,8 @@
 #include <memory>
 #include <functional>
 #include <atomic>
+#include <boost/filesystem/config.hpp>
+#include <boost/system/config.hpp>
 
 #include <Eigen/Core>
 

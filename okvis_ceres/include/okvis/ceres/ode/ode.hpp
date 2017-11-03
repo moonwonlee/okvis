@@ -55,7 +55,7 @@ namespace ceres {
 namespace ode {
 
 // to make things a bit faster than using angle-axis conversion:
-__inline__ double sinc(double x) {
+inline double sinc(double x) {
   if (fabs(x) > 1e-6) {
    return sin(x) / x;
    } else{
@@ -70,7 +70,7 @@ __inline__ double sinc(double x) {
 }
 
 // world-centric velocities
-__inline__ void evaluateContinuousTimeOde(const Eigen::Vector3d& gyr, const Eigen::Vector3d& acc, double g,
+inline void evaluateContinuousTimeOde(const Eigen::Vector3d& gyr, const Eigen::Vector3d& acc, double g,
                                           const Eigen::Vector3d& p_WS_W, const Eigen::Quaterniond& q_WS,
                                           const okvis::SpeedAndBias& sb, Eigen::Vector3d& p_WS_W_dot,
                                           Eigen::Vector4d& q_WS_dot, okvis::SpeedAndBias& sb_dot,
@@ -157,7 +157,7 @@ __inline__ void evaluateContinuousTimeOde(
   }
 }*/
 
-__inline__ void integrateOneStep_RungeKutta(
+inline void integrateOneStep_RungeKutta(
     const Eigen::Vector3d& gyr_0, const Eigen::Vector3d& acc_0,
     const Eigen::Vector3d& gyr_1, const Eigen::Vector3d& acc_1, double g,
     double sigma_g_c, double sigma_a_c, double sigma_gw_c, double sigma_aw_c,

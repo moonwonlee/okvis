@@ -36,13 +36,17 @@
  * @author Stefan Leutenegger
  */
 
+#ifndef M_PI
+  #define M_PI 3.14159265359
+#endif
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 /// \brief kinematics Namespace for kinematics functionality, i.e. transformations and stuff.
 namespace kinematics {
 
-__inline__ double sinc(double x) {
+inline double sinc(double x) {
   if (fabs(x) > 1e-6) {
     return sin(x) / x;
   } else {
@@ -56,7 +60,7 @@ __inline__ double sinc(double x) {
   }
 }
 
-__inline__ Eigen::Quaterniond deltaQ(const Eigen::Vector3d& dAlpha)
+inline Eigen::Quaterniond deltaQ(const Eigen::Vector3d& dAlpha)
 {
   Eigen::Vector4d dq;
   double halfnorm = 0.5 * dAlpha.template tail<3>().norm();
@@ -66,7 +70,7 @@ __inline__ Eigen::Quaterniond deltaQ(const Eigen::Vector3d& dAlpha)
 }
 
 // Right Jacobian, see Forster et al. RSS 2015 eqn. (8)
-__inline__ Eigen::Matrix3d rightJacobian(const Eigen::Vector3d & PhiVec) {
+inline Eigen::Matrix3d rightJacobian(const Eigen::Vector3d & PhiVec) {
   const double Phi = PhiVec.norm();
   Eigen::Matrix3d retMat = Eigen::Matrix3d::Identity();
   const Eigen::Matrix3d Phi_x = okvis::kinematics::crossMx(PhiVec);

@@ -10,6 +10,15 @@ endif()
 find_package( Eigen REQUIRED )
 include_directories(${EIGEN_INCLUDE_DIR}) 
 
+find_package( OpenGV REQUIRED )
+include_directories(${OPENGV_INCLUDE_DIR}) 
+
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC ON)
+  set(Boost_USE_MULTITHREAD )
+  FIND_PACKAGE(Boost REQUIRED COMPONENTS date_time filesystem system)
+  include_directories(${Boost_INCLUDE_DIRS}) 
+
 # build the library
 add_library(${PROJECT_NAME} 
   src/Frontend.cpp
@@ -31,8 +40,9 @@ add_library(${PROJECT_NAME}
 # and link it                 
 target_link_libraries(${PROJECT_NAME}
   PRIVATE ${BRISK_LIBRARIES} 
-  PRIVATE ${OpenGV_LIBRARIES} 
+  PRIVATE ${OPENGV_LIBS} 
   PRIVATE ${CERES_LIBRARIES}
+  PRIVATE ${Boost_LIBRARIES}
   PUBLIC okvis_util
   PUBLIC okvis_cv 
   PUBLIC okvis_ceres 

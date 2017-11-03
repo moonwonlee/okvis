@@ -49,6 +49,9 @@
 #include <okvis/MultiFrame.hpp>
 #include <okvis/assert_macros.hpp>
 
+#undef min
+#undef max
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -846,7 +849,7 @@ void Estimator::optimize(size_t numIter, size_t numThreads,
 #else
 void Estimator::optimize(size_t numIter, size_t /*numThreads*/,
                                  bool verbose) // avoid warning since numThreads unused
-#warning openmp not detected, your system may be slower than expected
+//#warning openmp not detected, your system may be slower than expected
 #endif
 
 {

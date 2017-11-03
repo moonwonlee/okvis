@@ -38,6 +38,10 @@
  * @author Andreas Forster
  */
 
+#ifndef M_PI
+	#define M_PI 3.14159265359
+#endif
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

@@ -47,7 +47,7 @@
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
 #pragma GCC diagnostic pop
 #pragma GCC diagnostic pop
 #include <Eigen/Dense>

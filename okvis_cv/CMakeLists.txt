@@ -7,8 +7,8 @@ find_package( Eigen REQUIRED )
 include_directories(${EIGEN_INCLUDE_DIR}) 
 
 # require OpenCV
-find_package( OpenCV COMPONENTS core highgui imgproc features2d REQUIRED )
-include_directories(BEFORE ${OpenCV_INCLUDE_DIRS}) 
+find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS}) 
 
 # build the library
 add_library(${PROJECT_NAME} STATIC 

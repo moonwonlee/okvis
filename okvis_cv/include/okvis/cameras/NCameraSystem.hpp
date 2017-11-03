@@ -44,7 +44,7 @@
 #include <memory>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-#include <opencv2/core/core.hpp> // Code that causes warning goes here
+#include <opencv2/core.hpp> // Code that causes warning goes here
 #pragma GCC diagnostic pop
 #include <okvis/kinematics/Transformation.hpp>
 #include <okvis/assert_macros.hpp>
