@@ -65,7 +65,9 @@ ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBac
       estimator_(estimator),
       frontend_(frontend),
       parameters_(parameters),
-      maxImuInputQueueSize_(60) {
+      maxImuInputQueueSize_(60),
+      keyframeSet_(false),
+      poseGraph_("ORBvoc.yml") {
   init();
 }
 #else
@@ -82,7 +84,9 @@ ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters)
       parameters_(parameters),
       maxImuInputQueueSize_(
           2 * max_camera_input_queue_size * parameters.imu.rate
-              / parameters.sensors_information.cameraRate) {
+              / parameters.sensors_information.cameraRate), 
+      keyframeSet_(false),
+      poseGraph_("ORBvoc.yml") {
   setBlocking(false);
   init();
 }
@@ -145,6 +149,7 @@ void ThreadedKFVio::startThreads() {
   // algorithm threads
   visualizationThread_ = std::thread(&ThreadedKFVio::visualizationLoop, this);
   optimizationThread_ = std::thread(&ThreadedKFVio::optimizationLoop, this);
+  keyframeProcessorThread_ = std::thread(&ThreadedKFVio::keyframeProcessorLoop, this);
   publisherThread_ = std::thread(&ThreadedKFVio::publisherLoop, this);
 }
 
@@ -160,6 +165,7 @@ ThreadedKFVio::~ThreadedKFVio() {
   visualizationData_.Shutdown();
   imuFrameSynchronizer_.shutdown();
   positionMeasurementsReceived_.Shutdown();
+  keyframeData_.Shutdown();
 
   // consumer threads
   for (size_t i = 0; i < numCameras_; ++i) {
@@ -175,6 +181,7 @@ ThreadedKFVio::~ThreadedKFVio() {
   differentialConsumerThread_.join();
   visualizationThread_.join();
   optimizationThread_.join();
+  keyframeProcessorThread_.join();
   publisherThread_.join();
 
   /*okvis::kinematics::Transformation endPosition;
@@ -200,6 +207,8 @@ bool ThreadedKFVio::addImage(const okvis::Time & stamp, size_t cameraIndex,
           > parameters_.sensors_information.frameTimestampTolerance) {
     LOG(ERROR)
         << "Received image from the past. Dropping the image.";
+    LOG(ERROR)
+        << "Last: " << lastAddedImageTimestamp_ << " Current: " << stamp;
     return false;
   }
   lastAddedImageTimestamp_ = stamp;
@@ -521,8 +530,50 @@ void ThreadedKFVio::matchingLoop() {
       frontend_.dataAssociationAndInitialization(estimator_, T_WS, parameters_,
                                                  map_, frame, &asKeyframe);
       matchingTimer.stop();
-      if (asKeyframe)
+
+      if (asKeyframe){
+        //JOE: 
+        //since we have a new keyframe want to add old one to pose graph
+        //may want to change to push blocking
+        //may need to include landmark observations or other information
+        //may need to increase queue size  
+
+        //need to add current landmark positions to frame
+        if(keyframeSet_){
+          PoseGraph::KeyframeData::Ptr keyframeDataPtr = PoseGraph::KeyframeData::Ptr(
+              new PoseGraph::KeyframeData());
+          keyframeDataPtr->keyFrames = estimator_.multiFrame(
+              estimator_.currentKeyframeId());
+          estimator_.get_T_WS(estimator_.currentKeyframeId(),
+                              keyframeDataPtr->T_WS_keyFrame);
+
+          //Get current landmark positions
+          keyframeDataPtr->observations.resize(keyframeDataPtr->keyFrames->numKeypoints());
+          okvis::MapPoint landmark;
+          okvis::ObservationVector::iterator it = keyframeDataPtr
+            ->observations.begin();
+          for (size_t k = 0; k < keyframeDataPtr->keyFrames->numKeypoints(0); ++k) {
+            OKVIS_ASSERT_TRUE_DBG(Exception,it != keyframeDataPtr->observations.end(),"Observation-vector not big enough");
+            it->landmarkId = keyframeDataPtr->keyFrames->landmarkId(0, k);
+            if (estimator_.isLandmarkAdded(it->landmarkId)) {
+              estimator_.getLandmark(it->landmarkId, landmark);
+              it->landmark_W = landmark.point;
+              if (estimator_.isLandmarkInitialized(it->landmarkId))
+                it->isInitialized = true;
+              else
+                it->isInitialized = false;
+            } else {
+              it->landmark_W = Eigen::Vector4d(0, 0, 0, 0);  // set to infinity to tell visualizer that landmark is not added
+            }
+            ++it;
+          }
+
+          keyframeData_.PushNonBlockingDroppingIfFull(keyframeDataPtr, 1);
+        } else{
+          keyframeSet_=true;
+        }
         estimator_.setKeyframe(frame->id(), asKeyframe);
+      } 
       if(!blocking_) {
         double timeLimit = parameters_.optimization.timeLimitForMatchingAndOptimization
                            -(okvis::Time::now()-t0Matching).toSec();
@@ -850,6 +901,72 @@ void ThreadedKFVio::optimizationLoop() {
       visualizationData_.PushNonBlockingDroppingIfFull(visualizationDataPtr, 1);
     }
     afterOptimizationTimer.stop();
+  }
+}
+
+// Loop that publishes the keyframes after leaving the optimization window
+// Will probably change this to do the actual pose graph processing at some point
+void ThreadedKFVio::keyframeProcessorLoop() {
+  for(;;) {
+    PoseGraph::KeyframeData::Ptr newKeyframe;
+    if(keyframeData_.PopBlocking(&newKeyframe) == false)
+      return;
+    std::vector<cv::KeyPoint> points;
+    points.reserve(newKeyframe->keyFrames->numKeypoints(0));
+    cv::Mat descriptors;
+    cv::Ptr<cv::ORB> orb = cv::ORB::create();
+    for (size_t k = 0; k < newKeyframe->keyFrames->numKeypoints(0); ++k) {
+      cv::KeyPoint kp;
+      newKeyframe->keyFrames->getCvKeypoint(0,k,kp);
+      points.emplace_back(kp);
+    }
+    
+    //detect orb descriptors
+    //later will just use brisk descriptors
+    orb->detectAndCompute(newKeyframe->keyFrames->image(0),cv::noArray(),points,descriptors,true);
+    if(descriptors.rows==0)
+      continue;
+
+    //convert to DBoW descriptor format
+    std::vector<cv::Mat> bowDesc;
+    bowDesc.reserve(descriptors.rows);
+    for(int i=0; i<descriptors.rows; i++){
+      bowDesc.emplace_back(descriptors.row(i));
+    } 
+
+    //get BoW vector for keyframe 
+    DBoW2::BowVector bowVec;
+    poseGraph_.vocab_->transform(bowDesc, bowVec);
+    newKeyframe->bowVec = bowVec;
+    if(bowVec.size()==0)
+      continue;
+    if(poseGraph_.posesSinceLastLoop_<20){
+      //std::cout<< "Adding To Database" << std::endl << std::flush;
+      poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(bowVec);
+      //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
+      poseGraph_.poses_.push_back(newKeyframe);
+      poseGraph_.posesSinceLastLoop_++;
+      continue;
+    }
+
+    //std::cout<< "Querying Database" << std::endl << std::flush;
+    DBoW2::QueryResults qret;
+    poseGraph_.db_->query(bowVec,qret,1,poseGraph_.lastEntry_-20);
+    float baseScore = poseGraph_.vocab_->score(bowVec,poseGraph_.poses_[poseGraph_.lastEntry_]->bowVec);
+    std::cout<< "BaseScore: " << baseScore << std::endl << std::flush;
+    if(qret.size()>0 && baseScore>0.1 && qret[0].Score/baseScore>0.9){
+      std::cout << "LOOP CLOSURE!" << std::endl;
+      poseGraph_.posesSinceLastLoop_=0;
+    }else{
+      poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(bowVec);
+      //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
+      poseGraph_.poses_.push_back(newKeyframe);
+      poseGraph_.posesSinceLastLoop_++;
+    }
+
+
+
+    //LOG(WARNING) << "new keyframe detected";
   }
 }
 

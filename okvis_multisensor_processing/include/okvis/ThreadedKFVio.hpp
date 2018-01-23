@@ -56,6 +56,7 @@
 #include <okvis/ImuFrameSynchronizer.hpp>
 #include <okvis/FrameSynchronizer.hpp>
 #include <okvis/VioVisualizer.hpp>
+#include <okvis/PoseGraph.hpp>
 #include <okvis/timing/Timer.hpp>
 #include <okvis/threadsafe/ThreadsafeQueue.hpp>
 
@@ -266,6 +267,8 @@ class ThreadedKFVio : public VioInterface {
   void visualizationLoop();
   /// \brief Loop that performs the optimization and marginalisation.
   void optimizationLoop();
+  /// \brief Loop that publishes the newest keyframes.
+  void keyframeProcessorLoop();
   /// \brief Loop that publishes the newest state and landmarks.
   void publisherLoop();
 
@@ -372,6 +375,8 @@ class ThreadedKFVio : public VioInterface {
   okvis::threadsafe::ThreadSafeQueue<VioVisualizer::VisualizationData::Ptr> visualizationData_;
   /// The queue containing the actual display images
   okvis::threadsafe::ThreadSafeQueue<std::vector<cv::Mat>> displayImages_;
+  /// The queue containing completed keyframes for pose graph processing.
+  okvis::threadsafe::ThreadSafeQueue<PoseGraph::KeyframeData::Ptr> keyframeData_;
 
   /// @}
   /// @name Mutexes
@@ -408,6 +413,7 @@ class ThreadedKFVio : public VioInterface {
   std::thread visualizationThread_; ///< Thread running visualizationLoop().
   std::thread optimizationThread_;  ///< Thread running optimizationLoop().
   std::thread publisherThread_;     ///< Thread running publisherLoop().
+  std::thread keyframeProcessorThread_; ///< Thread running keyframeProcessorLoop().
 
   /// @}
   /// @name Algorithm objects.
@@ -435,6 +441,9 @@ class ThreadedKFVio : public VioInterface {
 
   /// Max position measurements before dropping.
   const size_t maxPositionInputQueueSize_ = 10;
+
+  bool keyframeSet_;
+  PoseGraph poseGraph_;
   
 };
 

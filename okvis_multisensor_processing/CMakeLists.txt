@@ -24,6 +24,19 @@ include_directories(${EIGEN_INCLUDE_DIR})
 find_package( OpenCV COMPONENTS core highgui imgproc features2d REQUIRED )
 include_directories(BEFORE ${OpenCV_INCLUDE_DIRS}) 
 
+find_package(DBoW2 REQUIRED)
+IF(DBoW2_FOUND)
+   MESSAGE(STATUS "Found DBoW2: ${DBoW2_INCLUDE_DIRS}")
+ENDIF(DBoW2_FOUND)
+include_directories(BEFORE ${DBoW2_INCLUDE_DIRS}) 
+
+find_package(DLib REQUIRED)
+IF(DLib_FOUND)
+   MESSAGE(STATUS "Found DLib: ${DLib_LIBRARIES}")
+ENDIF(DLib_FOUND)
+include_directories(BEFORE ${DLib_INCLUDE_DIRS}) 
+
+
 add_library(${PROJECT_NAME}
   src/ThreadedKFVio.cpp
   src/ImuFrameSynchronizer.cpp
@@ -48,6 +61,8 @@ target_link_libraries(${PROJECT_NAME}
    PUBLIC okvis_ceres 
    PUBLIC okvis_frontend
    PRIVATE ${GLOG_LIBRARIES}
+   PRIVATE ${DBoW2_LIBRARIES}
+   PRIVATE ${DLib_LIBRARIES}
    #PRIVATE ${Boost_LIBRARIES}
 )
 

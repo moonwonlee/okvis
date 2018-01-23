@@ -306,10 +306,28 @@ int main(int argc, char **argv)
       }
     }
 
-    /// add images
+    /// select camera with smallest timestamp
     okvis::Time t;
-
+    okvis::Time min_t(0.0);
+    size_t min_cam =0;
     for (size_t i = 0; i < numCameras; ++i) {
+      //cv::Mat filtered = cv::imread(
+      //    path + "/cam" + std::to_string(i) + "/data/" + *cam_iterators.at(i),
+      //    cv::IMREAD_GRAYSCALE);
+      std::string nanoseconds = cam_iterators.at(i)->substr(
+          cam_iterators.at(i)->size() - 13, 9);
+      std::string seconds = cam_iterators.at(i)->substr(
+          0, cam_iterators.at(i)->size() - 13);
+      t = okvis::Time(std::stoi(seconds), std::stoi(nanoseconds));
+      if(t<min_t || min_t == okvis::Time(0.0)){
+          min_t = t;
+          min_cam = i;
+      }
+    }
+    //std::cout << "Adding Image From Camera: " << min_cam << " at: " << min_t << std::endl << std::flush;
+
+    {
+      size_t i=min_cam;
       cv::Mat filtered = cv::imread(
           path + "/cam" + std::to_string(i) + "/data/" + *cam_iterators.at(i),
           cv::IMREAD_GRAYSCALE);
