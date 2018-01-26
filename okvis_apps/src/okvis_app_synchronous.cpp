@@ -295,6 +295,7 @@ int main(int argc, char **argv)
   okvis::Time start(0.0);
   while (true) {
     okvis_estimator.display();
+    okvis_estimator.debugDisplay();
     poseViewer.display();
 
     // check if at the end

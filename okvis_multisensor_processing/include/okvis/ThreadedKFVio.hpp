@@ -235,6 +235,7 @@ class ThreadedKFVio : public VioInterface {
 
   /// \brief Trigger display (needed because OSX won't allow threaded display).
   void display();
+  void debugDisplay();
 
  private:
   /// \brief Start all threads.
@@ -375,6 +376,8 @@ class ThreadedKFVio : public VioInterface {
   okvis::threadsafe::ThreadSafeQueue<VioVisualizer::VisualizationData::Ptr> visualizationData_;
   /// The queue containing the actual display images
   okvis::threadsafe::ThreadSafeQueue<std::vector<cv::Mat>> displayImages_;
+  /// The queue containing the actual display images
+  okvis::threadsafe::ThreadSafeQueue<cv::Mat> debugImages_;
   /// The queue containing completed keyframes for pose graph processing.
   okvis::threadsafe::ThreadSafeQueue<PoseGraph::KeyframeData::Ptr> keyframeData_;
 

@@ -224,6 +224,7 @@ struct Observation
   Eigen::Vector2d keypointMeasurement;  ///< 2D image keypoint [pixels]
   double keypointSize;  ///< Keypoint size. Basically standard deviation of the image coordinates in pixels.
   Eigen::Vector4d landmark_W;  ///< landmark as homogeneous point in body frame B
+  Eigen::Vector4d landmark_C;  ///< landmark as homogeneous point in camera frame
   uint64_t landmarkId;  ///< unique landmark ID
   bool isInitialized;   ///< Initialisation status of landmark
 };

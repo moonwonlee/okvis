@@ -547,25 +547,28 @@ void ThreadedKFVio::matchingLoop() {
           estimator_.get_T_WS(estimator_.currentKeyframeId(),
                               keyframeDataPtr->T_WS_keyFrame);
 
+          //transform from world to camera coordinates
+            okvis::kinematics::Transformation keyframeT_CW = parameters_.nCameraSystem
+      .T_SC(0)->inverse() * keyframeDataPtr->T_WS_keyFrame.inverse();
+
           //Get current landmark positions
-          keyframeDataPtr->observations.resize(keyframeDataPtr->keyFrames->numKeypoints());
+          //keyframeDataPtr->observations.resize(keyframeDataPtr->keyFrames->numKeypoints());
           okvis::MapPoint landmark;
-          okvis::ObservationVector::iterator it = keyframeDataPtr
-            ->observations.begin();
+          okvis::Observation it;
+          //okvis::ObservationVector::iterator it = keyframeDataPtr
+          //  ->observations.begin();
           for (size_t k = 0; k < keyframeDataPtr->keyFrames->numKeypoints(0); ++k) {
-            OKVIS_ASSERT_TRUE_DBG(Exception,it != keyframeDataPtr->observations.end(),"Observation-vector not big enough");
-            it->landmarkId = keyframeDataPtr->keyFrames->landmarkId(0, k);
-            if (estimator_.isLandmarkAdded(it->landmarkId)) {
-              estimator_.getLandmark(it->landmarkId, landmark);
-              it->landmark_W = landmark.point;
-              if (estimator_.isLandmarkInitialized(it->landmarkId))
-                it->isInitialized = true;
-              else
-                it->isInitialized = false;
-            } else {
-              it->landmark_W = Eigen::Vector4d(0, 0, 0, 0);  // set to infinity to tell visualizer that landmark is not added
+            //OKVIS_ASSERT_TRUE_DBG(Exception,it != keyframeDataPtr->observations.end(),"Observation-vector not big enough");
+            it.landmarkId = keyframeDataPtr->keyFrames->landmarkId(0, k);
+            it.keypointIdx = k;
+            if (estimator_.isLandmarkAdded(it.landmarkId)) {
+              estimator_.getLandmark(it.landmarkId, landmark);
+              //landmark in camera coords
+              //TODO: change name to landmark_C
+              it.landmark_C = keyframeT_CW*landmark.point;
+              //if (estimator_.isLandmarkInitialized(it.landmarkId))
+                keyframeDataPtr->observations.push_back(it);
             }
-            ++it;
           }
 
           keyframeData_.PushNonBlockingDroppingIfFull(keyframeDataPtr, 1);
@@ -709,6 +712,19 @@ void ThreadedKFVio::display() {
   }
   cv::waitKey(1);
 }
+
+void ThreadedKFVio::debugDisplay() {
+  cv::Mat debug_image;
+  if (debugImages_.Size() == 0)
+  return;
+  if (debugImages_.PopBlocking(&debug_image) == false)
+    return;
+  // draw
+  cv::imshow("Debug", debug_image);
+  
+  cv::waitKey(1);
+}
+
 
 // Get a subset of the recorded IMU measurements.
 okvis::ImuMeasurementDeque ThreadedKFVio::getImuMeasurments(
@@ -912,37 +928,45 @@ void ThreadedKFVio::keyframeProcessorLoop() {
     if(keyframeData_.PopBlocking(&newKeyframe) == false)
       return;
     std::vector<cv::KeyPoint> points;
-    points.reserve(newKeyframe->keyFrames->numKeypoints(0));
-    cv::Mat descriptors;
-    cv::Ptr<cv::ORB> orb = cv::ORB::create();
-    for (size_t k = 0; k < newKeyframe->keyFrames->numKeypoints(0); ++k) {
+    points.reserve(newKeyframe->observations.size());
+    for (size_t k = 0; k < newKeyframe->observations.size(); ++k) {
       cv::KeyPoint kp;
-      newKeyframe->keyFrames->getCvKeypoint(0,k,kp);
+      newKeyframe->keyFrames->getCvKeypoint(0,newKeyframe->observations[k].keypointIdx,kp);
+
+      if(!okvis::in_image(kp.pt,newKeyframe->keyFrames->image(0))){
+        std::cout << "Point Not in Image\n";
+      }
       points.emplace_back(kp);
     }
+    //std::cout<< "points: " << points.size() << " kp: " << newKeyframe->keyFrames->numKeypoints(0) << std::endl;
     
     //detect orb descriptors
     //later will just use brisk descriptors
-    orb->detectAndCompute(newKeyframe->keyFrames->image(0),cv::noArray(),points,descriptors,true);
-    if(descriptors.rows==0)
+
+    cv::Ptr<cv::ORB> orb = cv::ORB::create();
+    orb->compute(newKeyframe->keyFrames->image(0),points,newKeyframe->descriptors);
+
+    //if we can not compute orb descriptors for all points, do not use keyframe
+    //this will not be an issue once we switch to brisk descriptors
+    if(points.size()!=newKeyframe->observations.size())
       continue;
 
     //convert to DBoW descriptor format
     std::vector<cv::Mat> bowDesc;
-    bowDesc.reserve(descriptors.rows);
-    for(int i=0; i<descriptors.rows; i++){
-      bowDesc.emplace_back(descriptors.row(i));
+    bowDesc.reserve(newKeyframe->descriptors.rows);
+    for(int i=0; i<newKeyframe->descriptors.rows; i++){
+      bowDesc.emplace_back(newKeyframe->descriptors.row(i));
     } 
 
     //get BoW vector for keyframe 
-    DBoW2::BowVector bowVec;
-    poseGraph_.vocab_->transform(bowDesc, bowVec);
-    newKeyframe->bowVec = bowVec;
-    if(bowVec.size()==0)
+    poseGraph_.vocab_->transform(bowDesc, newKeyframe->bowVec);
+    if(newKeyframe->bowVec.size()==0)
       continue;
     if(poseGraph_.posesSinceLastLoop_<20){
+      //20 is the min number of keyframes before we want to consider a loop closure
+      //this prevents us from trying to close the loop wuth very nearby frames
       //std::cout<< "Adding To Database" << std::endl << std::flush;
-      poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(bowVec);
+      poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(newKeyframe->bowVec);
       //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
       poseGraph_.poses_.push_back(newKeyframe);
       poseGraph_.posesSinceLastLoop_++;
@@ -951,19 +975,99 @@ void ThreadedKFVio::keyframeProcessorLoop() {
 
     //std::cout<< "Querying Database" << std::endl << std::flush;
     DBoW2::QueryResults qret;
-    poseGraph_.db_->query(bowVec,qret,1,poseGraph_.lastEntry_-20);
-    float baseScore = poseGraph_.vocab_->score(bowVec,poseGraph_.poses_[poseGraph_.lastEntry_]->bowVec);
-    std::cout<< "BaseScore: " << baseScore << std::endl << std::flush;
-    if(qret.size()>0 && baseScore>0.1 && qret[0].Score/baseScore>0.9){
-      std::cout << "LOOP CLOSURE!" << std::endl;
-      poseGraph_.posesSinceLastLoop_=0;
-    }else{
-      poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(bowVec);
-      //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
-      poseGraph_.poses_.push_back(newKeyframe);
-      poseGraph_.posesSinceLastLoop_++;
+    poseGraph_.db_->query(newKeyframe->bowVec,qret,1,poseGraph_.lastEntry_-20);
+    float baseScore = poseGraph_.vocab_->score(newKeyframe->bowVec,poseGraph_.poses_[poseGraph_.lastEntry_]->bowVec);
+    //std::cout<< "BaseScore: " << baseScore << std::endl << std::flush;
+    if(qret.size()>0 && baseScore>0.1 && qret[0].Score/baseScore>0.75){ 
+      //.01 is min similarity to previous frame,
+      //.75 is required similarity of matched frame relative to previous frame
+      //that is, the matched frame must be at least 75% as similar to the current
+      //frame as the current frame is to the previous frame
+
+      //match features
+      cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
+      std::vector<cv::DMatch> matches;
+      PoseGraph::KeyframeData::Ptr matchedFrame = poseGraph_.poses_[qret[0].Id];
+      matcher->match(newKeyframe->descriptors,matchedFrame->descriptors,matches);
+      //std::cout<< "points: " << points.size() << " kp: " << newKeyframe->keyFrames->numKeypoints(0) << std::endl;
+
+      //convert to pointcloud
+      PointCloud src,tgt;
+      //new keyframe first
+      src.reserve(points.size());
+      int j=0;
+      for(size_t k = 0; k < newKeyframe->observations.size(); ++k){
+        src.emplace_back(newKeyframe->observations[k].landmark_C.head(3));
+      }
+      //matched keyframe
+      tgt.reserve(matchedFrame->observations.size());
+      for(size_t k = 0; k < matchedFrame->observations.size(); ++k){
+        tgt.emplace_back(matchedFrame->observations[k].landmark_C.head(3));
+      }
+
+      //convert dmatch vector to correspondance vector
+      std::vector<int> correspondences(matches.size());
+      for(size_t j =0; j<matches.size(); j++){
+        correspondences[matches[j].queryIdx]=matches[j].trainIdx;
+      }
+
+      //Make confidence vector for ransac
+      std::vector<float> confidence(correspondences.size());
+      for(int j =0; j<correspondences.size(); j++){
+        confidence[j]=RANSAC_THRESHOLD*std::min(src[j].norm(),5.0);
+        //5.0 is the cutoff distance in meters for which
+        //we want to scale the error by
+        //this should be based off stereo baseline 
+        //or alternatively, imu accuracy for monocular
+      }
+
+      //compute transform using ransac
+      Eigen::Affine3d transform_estimate;
+      std::vector<bool> inliers;
+      int num_inliers;
+      CorrespondenceRansac::getInliersWithTransform(
+        src,tgt, correspondences, RANSAC_POINTS, 
+        confidence, RANSAC_ITERATIONS, num_inliers, 
+        inliers, transform_estimate);
+
+      std::vector<cv::KeyPoint> matchedPoints;
+      matchedPoints.reserve(matchedFrame->observations.size());
+      for (size_t k = 0; k < matchedFrame->observations.size(); ++k) {
+        cv::KeyPoint kp;
+        matchedFrame->keyFrames->getCvKeypoint(0,matchedFrame->observations[k].keypointIdx,kp);
+
+        if(!okvis::in_image(kp.pt,matchedFrame->keyFrames->image(0))){
+          std::cout << "Point Not in Image\n";
+        }
+        matchedPoints.emplace_back(kp);
+      }
+
+      std::vector<char> disp_inliers(inliers.size());
+      for(int i=0; i<inliers.size(); i++){
+        disp_inliers[i] = inliers[i];
+      }
+
+      cv::Mat outImg;
+      cv::drawMatches(newKeyframe->keyFrames->image(0),points,
+        matchedFrame->keyFrames->image(0),matchedPoints,matches,outImg,
+        cv::Scalar::all(-1), cv::Scalar::all(-1), 
+        disp_inliers, cv::DrawMatchesFlags::DEFAULT);
+
+      debugImages_.PushNonBlockingDroppingIfFull(outImg, 1);
+
+
+      if(num_inliers/(float)correspondences.size()>0.301){
+        //.301 was experimentally determined to give good results
+        //it is the % required inliers for the loop closure to be good
+        std::cout << "LOOP CLOSURE: " << num_inliers/(float)correspondences.size() << "%% inliers" << std::endl;
+        poseGraph_.posesSinceLastLoop_=0;
+      }
     }
 
+    poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(newKeyframe->bowVec);
+    //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
+    poseGraph_.poses_.push_back(newKeyframe);
+    poseGraph_.posesSinceLastLoop_++;
 
 
     //LOG(WARNING) << "new keyframe detected";
