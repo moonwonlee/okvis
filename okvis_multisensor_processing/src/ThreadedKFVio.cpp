@@ -545,11 +545,14 @@ void ThreadedKFVio::matchingLoop() {
           keyframeDataPtr->keyFrames = estimator_.multiFrame(
               estimator_.currentKeyframeId());
           estimator_.get_T_WS(estimator_.currentKeyframeId(),
-                              keyframeDataPtr->T_WS_keyFrame);
+                              keyframeDataPtr->T_WS);
 
           //transform from world to camera coordinates
-            okvis::kinematics::Transformation keyframeT_CW = parameters_.nCameraSystem
-      .T_SC(0)->inverse() * keyframeDataPtr->T_WS_keyFrame.inverse();
+          okvis::kinematics::Transformation keyframeT_CW = parameters_.nCameraSystem
+              .T_SC(0)->inverse() * keyframeDataPtr->T_WS.inverse();
+
+          //transform from new keyframe to old keyframe        
+          keyframeDataPtr->T_SoSn = poseGraph_.lastKeyframeT_SoW*keyframeDataPtr->T_WS;  
 
           //Get current landmark positions
           //keyframeDataPtr->observations.resize(keyframeDataPtr->keyFrames->numKeypoints());
@@ -564,14 +567,14 @@ void ThreadedKFVio::matchingLoop() {
             if (estimator_.isLandmarkAdded(it.landmarkId)) {
               estimator_.getLandmark(it.landmarkId, landmark);
               //landmark in camera coords
-              //TODO: change name to landmark_C
               it.landmark_C = keyframeT_CW*landmark.point;
               //if (estimator_.isLandmarkInitialized(it.landmarkId))
-                keyframeDataPtr->observations.push_back(it);
+              keyframeDataPtr->observations.push_back(it);
             }
           }
-
-          keyframeData_.PushNonBlockingDroppingIfFull(keyframeDataPtr, 1);
+          okvis::kinematics::Transformation lastT_SW = keyframeDataPtr->T_WS.inverse();
+          if(!keyframeData_.PushNonBlockingDroppingIfFull(keyframeDataPtr, 1))
+            poseGraph_.lastKeyframeT_SoW = lastT_SW;
         } else{
           keyframeSet_=true;
         }
@@ -927,6 +930,12 @@ void ThreadedKFVio::keyframeProcessorLoop() {
     PoseGraph::KeyframeData::Ptr newKeyframe;
     if(keyframeData_.PopBlocking(&newKeyframe) == false)
       return;
+
+    poseGraph_.currentKeyframeT_WSo = poseGraph_.currentKeyframeT_WSo*newKeyframe->T_SoSn;
+    newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+    if (stateCallback_)
+      stateCallback_(okvis::Time(),poseGraph_.currentKeyframeT_WSo);
+
     std::vector<cv::KeyPoint> points;
     points.reserve(newKeyframe->observations.size());
     for (size_t k = 0; k < newKeyframe->observations.size(); ++k) {
@@ -1030,6 +1039,11 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         confidence, RANSAC_ITERATIONS, num_inliers, 
         inliers, transform_estimate);
 
+      //compute final transform
+      CorrespondenceRansac::getFinalTransform(
+        src, tgt, correspondences, inliers,
+        transform_estimate);
+
       std::vector<cv::KeyPoint> matchedPoints;
       matchedPoints.reserve(matchedFrame->observations.size());
       for (size_t k = 0; k < matchedFrame->observations.size(); ++k) {
@@ -1057,6 +1071,8 @@ void ThreadedKFVio::keyframeProcessorLoop() {
 
 
       if(num_inliers/(float)correspondences.size()>0.301){
+        poseGraph_.currentKeyframeT_WSo= matchedFrame->T_WS*okvis::kinematics::Transformation(transform_estimate.matrix()).inverse();
+        newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
         //.301 was experimentally determined to give good results
         //it is the % required inliers for the loop closure to be good
         std::cout << "LOOP CLOSURE: " << num_inliers/(float)correspondences.size() << "%% inliers" << std::endl;
@@ -1083,8 +1099,8 @@ void ThreadedKFVio::publisherLoop() {
       return;
 
     // call all user callbacks
-    if (stateCallback_ && !result.onlyPublishLandmarks)
-      stateCallback_(result.stamp, result.T_WS);
+    //if (stateCallback_ && !result.onlyPublishLandmarks)
+      //stateCallback_(result.stamp, result.T_WS);
     if (fullStateCallback_ && !result.onlyPublishLandmarks)
       fullStateCallback_(result.stamp, result.T_WS, result.speedAndBiases,
                          result.omega_S);
