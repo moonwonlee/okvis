@@ -932,7 +932,37 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       return;
 
     poseGraph_.currentKeyframeT_WSo = poseGraph_.currentKeyframeT_WSo*newKeyframe->T_SoSn;
+
+    Pose3dNode node;
+    node.q = newKeyframe->T_WS.q();
+    node.p = newKeyframe->T_WS.r();
+
+    poseGraph_.originalNodes_[poseGraph_.poses_.size()]=node;
+    
     newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+    node.q = newKeyframe->T_WS.q();
+    node.p = newKeyframe->T_WS.r();
+
+    poseGraph_.nodes_[poseGraph_.poses_.size()]=node;
+
+    if(poseGraph_.poses_.size()>0){
+
+      Pose3dNode newDiffConstraintNode;
+      newDiffConstraintNode.q = newKeyframe->T_SoSn.q();
+      newDiffConstraintNode.p = newKeyframe->T_SoSn.r();
+
+      Constraint3dNode newDiffConstraint;
+      newDiffConstraint.t_be = newDiffConstraintNode;
+      newDiffConstraint.id_begin = poseGraph_.poses_.size()-1;
+      newDiffConstraint.id_end = poseGraph_.poses_.size();
+      newDiffConstraint.information = Eigen::Matrix<double,6,6>::Identity();
+      poseGraph_.constraints_.push_back(newDiffConstraint);
+
+    }
+
+    poseGraph_.OutputPoses("poses.txt");
+    poseGraph_.OutputPoses("orig_poses.txt", poseGraph_.originalNodes_);
+
     if (stateCallback_)
       stateCallback_(okvis::Time(),poseGraph_.currentKeyframeT_WSo);
 
@@ -1071,8 +1101,24 @@ void ThreadedKFVio::keyframeProcessorLoop() {
 
 
       if(num_inliers/(float)correspondences.size()>0.301){
-        poseGraph_.currentKeyframeT_WSo= matchedFrame->T_WS*okvis::kinematics::Transformation(transform_estimate.matrix()).inverse();
+        okvis::kinematics::Transformation okvis_estimate(transform_estimate.inverse().matrix());
+        poseGraph_.currentKeyframeT_WSo= matchedFrame->T_WS*okvis_estimate;
         newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+
+        Pose3dNode newConstraintNode;
+        newConstraintNode.q = okvis_estimate.q();
+        newConstraintNode.p = okvis_estimate.r();
+        Constraint3dNode newConstraint;
+        newConstraint.t_be = newConstraintNode;
+        newConstraint.id_begin = qret[0].Id;
+        newConstraint.id_end = poseGraph_.poses_.size();
+        newConstraint.information = Eigen::Matrix<double,6,6>::Identity()/4;
+
+        poseGraph_.constraints_.push_back(newConstraint);
+        ::ceres::Problem problem;
+        poseGraph_.BuildOptimizationProblem(&problem);
+        poseGraph_.SolveOptimizationProblem(&problem);
+        poseGraph_.OutputPoses("poses.txt");
         //.301 was experimentally determined to give good results
         //it is the % required inliers for the loop closure to be good
         std::cout << "LOOP CLOSURE: " << num_inliers/(float)correspondences.size() << "%% inliers" << std::endl;
