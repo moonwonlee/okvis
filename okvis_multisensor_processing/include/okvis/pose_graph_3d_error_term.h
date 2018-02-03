@@ -125,6 +125,54 @@ class PoseGraph3dErrorTerm {
   const Eigen::Matrix<double, 6, 6> sqrt_information_;
 };
 
+
+class PoseGraphGravityTerm {
+ public:
+  PoseGraphGravityTerm(const Eigen::Vector3d& g_measured,
+                       const Eigen::Matrix<double, 3, 3>& sqrt_information)
+      : g_measured_(g_measured), sqrt_information_(sqrt_information) {}
+
+  template <typename T>
+  bool operator()(const T* const q_a_ptr,
+                  T* residuals_ptr) const {
+    Eigen::Map<const Eigen::Quaternion<T> > q_a(q_a_ptr);
+
+    // Represent the displacement between the two frames in the A frame.
+    Eigen::Matrix<T, 3, 1> g_estimated = q_a * Eigen::Vector3d(0,0,1).template cast<T>();
+
+    // Compute the residuals.
+    // [ position         ]   [ delta_p          ]
+    // [ orientation (3x1)] = [ 2 * delta_q(0:2) ]
+    Eigen::Map<Eigen::Matrix<T, 3, 1> > residuals(residuals_ptr);
+    residuals.template block<3, 1>(0, 0) =
+        g_estimated - g_measured_.template cast<T>();
+
+    // Scale the residuals by the measurement uncertainty.
+    residuals.applyOnTheLeft(sqrt_information_.template cast<T>());
+
+    return true;
+  }
+
+  static ::ceres::CostFunction* Create(
+      const Eigen::Vector3d& g_measured,
+      const Eigen::Matrix<double, 3, 3>& sqrt_information) {
+    return new ::ceres::AutoDiffCostFunction<PoseGraphGravityTerm, 3, 4>(
+        new PoseGraphGravityTerm(g_measured, sqrt_information));
+  }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+ private:
+  // The measurement for the position of B relative to A in the A frame.
+  const Eigen::Vector3d g_measured_;
+  // The square root of the measurement information matrix.
+  const Eigen::Matrix<double, 3, 3> sqrt_information_;
+};
+
+
+
+
+
 }  // namespace examples
 
 #endif  // EXAMPLES_CERES_POSE_GRAPH_3D_ERROR_TERM_H_

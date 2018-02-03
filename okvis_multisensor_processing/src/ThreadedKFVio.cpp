@@ -958,6 +958,12 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       newDiffConstraint.information = Eigen::Matrix<double,6,6>::Identity();
       poseGraph_.constraints_.push_back(newDiffConstraint);
 
+      GravityNode newGravityConstraint;
+      newGravityConstraint.g = newKeyframe->T_WS.q()*Eigen::Vector3d(0,0,1);
+      newGravityConstraint.id = poseGraph_.poses_.size();
+      newGravityConstraint.information = Eigen::Matrix3d::Identity();
+      poseGraph_.gravity_.push_back(newGravityConstraint);
+
     }
 
     poseGraph_.OutputPoses("poses.txt");
@@ -1023,10 +1029,12 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       //that is, the matched frame must be at least 75% as similar to the current
       //frame as the current frame is to the previous frame
 
+      PoseGraph::KeyframeData::Ptr matchedFrame = poseGraph_.poses_[qret[0].Id];
+      /*
       //match features
       cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
       std::vector<cv::DMatch> matches;
-      PoseGraph::KeyframeData::Ptr matchedFrame = poseGraph_.poses_[qret[0].Id];
+      
       matcher->match(newKeyframe->descriptors,matchedFrame->descriptors,matches);
       //std::cout<< "points: " << points.size() << " kp: " << newKeyframe->keyFrames->numKeypoints(0) << std::endl;
 
@@ -1073,7 +1081,7 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       CorrespondenceRansac::getFinalTransform(
         src, tgt, correspondences, inliers,
         transform_estimate);
-
+*/
       std::vector<cv::KeyPoint> matchedPoints;
       matchedPoints.reserve(matchedFrame->observations.size());
       for (size_t k = 0; k < matchedFrame->observations.size(); ++k) {
@@ -1086,24 +1094,94 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         matchedPoints.emplace_back(kp);
       }
 
-      std::vector<char> disp_inliers(inliers.size());
-      for(int i=0; i<inliers.size(); i++){
-        disp_inliers[i] = inliers[i];
+      std::vector<cv::Point2f> matchedFeatures, newFeatures, newFeaturesFinal;
+      okvis::keypoints_to_features(matchedPoints, matchedFeatures);
+
+      std::vector<unsigned char> valid;
+      std::vector<float> err;
+
+      calcOpticalFlowPyrLK(
+        matchedFrame->keyFrames->image(0), newKeyframe->keyFrames->image(0),
+        matchedFeatures, newFeatures,valid,err,cv::Size(11,11),3,
+        cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01),
+        cv::OPTFLOW_LK_GET_MIN_EIGENVALS, 1e-4);
+
+      cv::Mat outImg(matchedFrame->keyFrames->image(0).rows,
+        matchedFrame->keyFrames->image(0).cols+newKeyframe->keyFrames->image(0).cols, CV_8UC1);
+      cv::Mat left(outImg, cv::Rect(0,0,matchedFrame->keyFrames->image(0).cols,matchedFrame->keyFrames->image(0).rows));
+      cv::Mat right(outImg, cv::Rect(matchedFrame->keyFrames->image(0).cols,0,newKeyframe->keyFrames->image(0).cols,matchedFrame->keyFrames->image(0).rows));
+      matchedFrame->keyFrames->image(0).copyTo(left);
+      newKeyframe->keyFrames->image(0).copyTo(right);
+      for(int i=0; i <matchedFeatures.size(); i++){
+        if(valid[i])
+          line(outImg, matchedFeatures[i],cv::Point2f(newFeatures[i].x+matchedFrame->keyFrames->image(0).cols,newFeatures[i].y),cv::Scalar(255,0,0));
       }
 
-      cv::Mat outImg;
-      cv::drawMatches(newKeyframe->keyFrames->image(0),points,
-        matchedFrame->keyFrames->image(0),matchedPoints,matches,outImg,
-        cv::Scalar::all(-1), cv::Scalar::all(-1), 
-        disp_inliers, cv::DrawMatchesFlags::DEFAULT);
+      std::vector<cv::Point3f> matchedPoints3d;
+      for (size_t k = 0; k < matchedFrame->observations.size(); ++k) {
+        if(valid[k]){
+          Eigen::Vector4d matchedPoint4d = matchedFrame->observations[k].landmark_C;
+          cv::Point3f matchedPoint3d(matchedPoint4d[0],matchedPoint4d[1],matchedPoint4d[2]);
+          matchedPoints3d.push_back(matchedPoint3d);
+          newFeaturesFinal.push_back(newFeatures[k]);
+        }
+      }
+      std::cout << "finalFeatureSize:" << newFeaturesFinal.size() << std::endl;
+
+      //get intrinsics and distortion coeffs from fame
+      Eigen::VectorXd full_intrinsics;
+      newKeyframe->keyFrames->geometry(0)->getIntrinsics(full_intrinsics);
+
+      cv::Mat cameraMatrix(3,3,cv::DataType<double>::type);
+      cv::Mat distCoeffs(4,1,cv::DataType<double>::type);
+      cameraMatrix.at<double>(0,0) = full_intrinsics[0];
+      cameraMatrix.at<double>(1,1) = full_intrinsics[1];
+      cameraMatrix.at<double>(0,2) = full_intrinsics[2];
+      cameraMatrix.at<double>(1,2) = full_intrinsics[3];
+
+      distCoeffs.at<double>(0) = full_intrinsics[4];
+      distCoeffs.at<double>(1) = full_intrinsics[5];
+      distCoeffs.at<double>(2) = full_intrinsics[6];
+      distCoeffs.at<double>(3) = full_intrinsics[7];
+
+      cv::Mat rvec(3,1,cv::DataType<double>::type);
+      cv::Mat tvec(3,1,cv::DataType<double>::type);
+
+      std::vector<int> pnpInliers; 
+      solvePnPRansac(matchedPoints3d, newFeaturesFinal, 
+        cameraMatrix, distCoeffs, rvec, tvec, false, 100, 2.0,
+        0.5,pnpInliers);
+
+      cv::Mat R; 
+      cv::Rodrigues(rvec,R);
+      tvec= -R*tvec;
+
+      Eigen::Matrix3d rot;
+      cv::cv2eigen(R,rot);
+
+      Eigen::Vector3d trans;
+      cv::cv2eigen(tvec,trans);
+      Eigen::Affine3d transform_estimate = Eigen::Translation3d(trans)*Eigen::Quaterniond(rot);
+
+      //std::vector<char> disp_inliers(newFeaturesFinal.size());
+      //for(int i=0; i<pnpInliers.size(); i++){
+      //  disp_inliers[pnpInliers[i]] = 1;
+      //}
+
+      //cv::Mat outImg;
+      //cv::drawMatches(newKeyframe->keyFrames->image(0),points,
+      //  matchedFrame->keyFrames->image(0),matchedPoints,matches,outImg,
+      //  cv::Scalar::all(-1), cv::Scalar::all(-1), 
+      //  disp_inliers, cv::DrawMatchesFlags::DEFAULT);
 
       debugImages_.PushNonBlockingDroppingIfFull(outImg, 1);
 
 
-      if(num_inliers/(float)correspondences.size()>0.301){
-        okvis::kinematics::Transformation okvis_estimate(transform_estimate.inverse().matrix());
-        poseGraph_.currentKeyframeT_WSo= matchedFrame->T_WS*okvis_estimate;
-        newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+      if(pnpInliers.size()/(float)newFeaturesFinal.size()>0.301){
+        okvis::kinematics::Transformation okvis_estimate(transform_estimate.matrix());
+        //this needs to be updated to the T_WS of the pose from the last node in the optimized pose graph. After optimization
+        //poseGraph_.currentKeyframeT_WSo= matchedFrame->T_WS*okvis_estimate;
+        //newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
 
         Pose3dNode newConstraintNode;
         newConstraintNode.q = okvis_estimate.q();
@@ -1119,10 +1197,13 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         poseGraph_.BuildOptimizationProblem(&problem);
         poseGraph_.SolveOptimizationProblem(&problem);
         poseGraph_.OutputPoses("poses.txt");
+
+        poseGraph_.currentKeyframeT_WSo= okvis::kinematics::Transformation(poseGraph_.nodes_[poseGraph_.poses_.size()].p,poseGraph_.nodes_[poseGraph_.poses_.size()].q);
+        newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
         //.301 was experimentally determined to give good results
         //it is the % required inliers for the loop closure to be good
-        std::cout << "LOOP CLOSURE: " << num_inliers/(float)correspondences.size() << "%% inliers" << std::endl;
-        poseGraph_.posesSinceLastLoop_=0;
+        std::cout << "LOOP CLOSURE: " << pnpInliers.size()/(float)newFeaturesFinal.size() << "%% inliers" << std::endl;
+        //poseGraph_.posesSinceLastLoop_=0;
       }
     }
 

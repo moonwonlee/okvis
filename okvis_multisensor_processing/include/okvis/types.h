@@ -54,9 +54,26 @@ struct Pose3dNode {
 
 };
 
+
 typedef std::map<int, Pose3dNode, std::less<int>,
                  Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >
     MapOfPoses;
+
+struct GravityNode {
+  Eigen::Vector3d g;
+  int id;
+  Eigen::Matrix<double, 3, 3> information;
+  // The name of the data type in the g2o file format.
+  static std::string name() {
+    return "GRAVITY";
+  }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+};
+
+typedef std::vector<GravityNode, Eigen::aligned_allocator<GravityNode> >
+    VectorOfGravityConstraints;
 
 // The constraint between two vertices in the pose graph. The constraint is the
 // transformation from vertex id_begin to vertex id_end.

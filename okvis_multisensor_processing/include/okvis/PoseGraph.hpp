@@ -14,6 +14,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <opencv2/core/eigen.hpp>
 
 
 #define RANSAC_POINTS 3 //Number of random samples per iteration
@@ -30,6 +31,21 @@ namespace okvis {
 inline bool in_image(cv::Point pt, const cv::Mat& image){
   return pt.y>0 && pt.y < image.rows && pt.x>0 && pt.x < image.cols;
 }
+
+///
+/// Converts a vector between cv::Point2f and cv::Keypoint
+/// Needed for different algorithms in OpenCV
+///
+inline void keypoints_to_features(const std::vector<cv::KeyPoint>& keypoints_in, 
+                  std::vector<cv::Point2f>& features_out){
+  features_out.resize(keypoints_in.size());
+  for(int i =0; i<keypoints_in.size(); i++){
+    features_out[i] = keypoints_in[i].pt;
+  }
+
+}
+
+
 
 /**
  * @brief This class is responsible to visualize the matching results
@@ -48,14 +64,15 @@ class PoseGraph {
   }
 
   void BuildOptimizationProblem(::ceres::Problem* problem){
-    BuildOptimizationProblem(constraints_,&nodes_,problem);
+    BuildOptimizationProblem(constraints_,&nodes_,gravity_,problem);
   }
 
 
   // Constructs the nonlinear least squares optimization problem from the pose
   // graph constraints.
   void BuildOptimizationProblem(const VectorOfConstraints& constraints,
-                                MapOfPoses* poses, ::ceres::Problem* problem) {
+                                MapOfPoses* poses, const VectorOfGravityConstraints& gravity_nodes,
+                                ::ceres::Problem* problem) {
     CHECK(poses != NULL);
     CHECK(problem != NULL);
     if (constraints.empty()) {
@@ -95,6 +112,29 @@ class PoseGraph {
                                    quaternion_local_parameterization);
       problem->SetParameterization(pose_end_iter->second.q.coeffs().data(),
                                    quaternion_local_parameterization);
+    }
+
+
+    for (VectorOfGravityConstraints::const_iterator gravity_iter =
+             gravity_nodes.begin();
+         gravity_iter != gravity_nodes.end(); ++gravity_iter) {
+      GravityNode gravity = *gravity_iter;
+      MapOfPoses::iterator pose_iter = poses->find(gravity.id);
+      CHECK(pose_iter != poses->end())
+          << "Pose with ID: " << gravity.id << " not found.";
+
+      const Eigen::Matrix<double, 3, 3> sqrt_information = gravity.information.llt().matrixL();
+
+      ::ceres::CostFunction* cost_function =
+          PoseGraphGravityTerm::Create(gravity.g, sqrt_information);
+
+      problem->AddResidualBlock(cost_function, loss_function,
+                                pose_iter->second.q.coeffs().data());
+
+      problem->SetParameterization(pose_iter->second.q.coeffs().data(),
+                                   quaternion_local_parameterization);
+
+
     }
 
     // The pose graph optimization problem has six DOFs that are not fully
@@ -175,6 +215,7 @@ class PoseGraph {
   DBoW2::EntryId lastEntry_;
 
   VectorOfConstraints constraints_;
+  VectorOfGravityConstraints gravity_;
   MapOfPoses nodes_;
   MapOfPoses originalNodes_;
 
