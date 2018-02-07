@@ -8,17 +8,12 @@
 #include <okvis/FrameTypedefs.hpp>
 #include "glog/logging.h"
 #include "pose_graph_3d_error_term.h"
+#include "gravity_error_term.h"
 #include "types.h"
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <opencv2/core/eigen.hpp>
-
-
-#define RANSAC_POINTS 3 //Number of random samples per iteration
-#define RANSAC_THRESHOLD .2f //Allowable distance in m to be inlier for object 1m away
-#define RANSAC_ITERATIONS 100 //Number of ransac iterations to perform
-
 
 
 #include <DBoW2.h>
@@ -191,8 +186,8 @@ class PoseGraph {
   }
 
   /// @brief This struct contains the relevant data for visualizing
-  struct KeyframeData {
-    typedef std::shared_ptr<KeyframeData> Ptr;
+  struct KeyFrameData {
+    typedef std::shared_ptr<KeyFrameData> Ptr;
     std::shared_ptr<okvis::MultiFrame> keyFrames;     ///< Current keyframe.
     okvis::kinematics::Transformation T_WS;  ///< Pose of the current keyframe
     okvis::kinematics::Transformation T_SoSn;  ///< Pose of the current keyframe
@@ -202,9 +197,14 @@ class PoseGraph {
     cv::Mat descriptors;
   };
 
+  void processKeyFrame(KeyFrameData::Ptr kf){
+
+  }
+
+
   std::unique_ptr<OrbVocabulary> vocab_;
   std::unique_ptr<OrbDatabase> db_;
-  std::vector<KeyframeData::Ptr> poses_;
+  std::vector<KeyFrameData::Ptr> poses_;
 
   okvis::kinematics::Transformation lastKeyframeT_SoW;
   okvis::kinematics::Transformation currentKeyframeT_WSo;

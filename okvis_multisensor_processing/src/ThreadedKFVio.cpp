@@ -165,7 +165,7 @@ ThreadedKFVio::~ThreadedKFVio() {
   visualizationData_.Shutdown();
   imuFrameSynchronizer_.shutdown();
   positionMeasurementsReceived_.Shutdown();
-  keyframeData_.Shutdown();
+  keyFrameData_.Shutdown();
 
   // consumer threads
   for (size_t i = 0; i < numCameras_; ++i) {
@@ -540,19 +540,19 @@ void ThreadedKFVio::matchingLoop() {
 
         //need to add current landmark positions to frame
         if(keyframeSet_){
-          PoseGraph::KeyframeData::Ptr keyframeDataPtr = PoseGraph::KeyframeData::Ptr(
-              new PoseGraph::KeyframeData());
-          keyframeDataPtr->keyFrames = estimator_.multiFrame(
+          PoseGraph::KeyFrameData::Ptr keyFrameDataPtr = PoseGraph::KeyFrameData::Ptr(
+              new PoseGraph::KeyFrameData());
+          keyFrameDataPtr->keyFrames = estimator_.multiFrame(
               estimator_.currentKeyframeId());
           estimator_.get_T_WS(estimator_.currentKeyframeId(),
-                              keyframeDataPtr->T_WS);
+                              keyFrameDataPtr->T_WS);
 
           //transform from world to camera coordinates
           okvis::kinematics::Transformation keyframeT_CW = parameters_.nCameraSystem
-              .T_SC(0)->inverse() * keyframeDataPtr->T_WS.inverse();
+              .T_SC(0)->inverse() * keyFrameDataPtr->T_WS.inverse();
 
           //transform from new keyframe to old keyframe        
-          keyframeDataPtr->T_SoSn = poseGraph_.lastKeyframeT_SoW*keyframeDataPtr->T_WS;  
+          keyFrameDataPtr->T_SoSn = poseGraph_.lastKeyframeT_SoW*keyFrameDataPtr->T_WS;  
 
           //Get current landmark positions
           //keyframeDataPtr->observations.resize(keyframeDataPtr->keyFrames->numKeypoints());
@@ -560,20 +560,20 @@ void ThreadedKFVio::matchingLoop() {
           okvis::Observation it;
           //okvis::ObservationVector::iterator it = keyframeDataPtr
           //  ->observations.begin();
-          for (size_t k = 0; k < keyframeDataPtr->keyFrames->numKeypoints(0); ++k) {
+          for (size_t k = 0; k < keyFrameDataPtr->keyFrames->numKeypoints(0); ++k) {
             //OKVIS_ASSERT_TRUE_DBG(Exception,it != keyframeDataPtr->observations.end(),"Observation-vector not big enough");
-            it.landmarkId = keyframeDataPtr->keyFrames->landmarkId(0, k);
+            it.landmarkId = keyFrameDataPtr->keyFrames->landmarkId(0, k);
             it.keypointIdx = k;
             if (estimator_.isLandmarkAdded(it.landmarkId)) {
               estimator_.getLandmark(it.landmarkId, landmark);
               //landmark in camera coords
               it.landmark_C = keyframeT_CW*landmark.point;
               //if (estimator_.isLandmarkInitialized(it.landmarkId))
-              keyframeDataPtr->observations.push_back(it);
+              keyFrameDataPtr->observations.push_back(it);
             }
           }
-          okvis::kinematics::Transformation lastT_SW = keyframeDataPtr->T_WS.inverse();
-          if(!keyframeData_.PushNonBlockingDroppingIfFull(keyframeDataPtr, 1))
+          okvis::kinematics::Transformation lastT_SW = keyFrameDataPtr->T_WS.inverse();
+          if(!keyFrameData_.PushNonBlockingDroppingIfFull(keyFrameDataPtr, 1))
             poseGraph_.lastKeyframeT_SoW = lastT_SW;
         } else{
           keyframeSet_=true;
@@ -928,8 +928,8 @@ void ThreadedKFVio::optimizationLoop() {
 void ThreadedKFVio::keyframeProcessorLoop() {
   for(;;) {
     //Wait for new keyframe
-    PoseGraph::KeyframeData::Ptr newKeyframe;
-    if(keyframeData_.PopBlocking(&newKeyframe) == false)
+    PoseGraph::KeyFrameData::Ptr newKeyframe;
+    if(keyFrameData_.PopBlocking(&newKeyframe) == false)
       return;
 
     //All of the below should be moved to the pose graph.hpp file
@@ -1040,7 +1040,7 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       //frame as the current frame is to the previous frame
 
       //if the matched frame is similar enough, attempt to compute SE3 transform
-      PoseGraph::KeyframeData::Ptr matchedFrame = poseGraph_.poses_[qret[0].Id];
+      PoseGraph::KeyFrameData::Ptr matchedFrame = poseGraph_.poses_[qret[0].Id];
 
       //get keypoints from frame
       std::vector<cv::KeyPoint> matchedPoints;

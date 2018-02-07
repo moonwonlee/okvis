@@ -379,7 +379,7 @@ class ThreadedKFVio : public VioInterface {
   /// The queue containing the actual display images
   okvis::threadsafe::ThreadSafeQueue<cv::Mat> debugImages_;
   /// The queue containing completed keyframes for pose graph processing.
-  okvis::threadsafe::ThreadSafeQueue<PoseGraph::KeyframeData::Ptr> keyframeData_;
+  okvis::threadsafe::ThreadSafeQueue<PoseGraph::KeyFrameData::Ptr> keyFrameData_;
 
   /// @}
   /// @name Mutexes
