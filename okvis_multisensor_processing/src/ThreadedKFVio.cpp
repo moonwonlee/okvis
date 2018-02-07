@@ -943,9 +943,9 @@ void ThreadedKFVio::keyframeProcessorLoop() {
     poseGraph_.originalNodes_[poseGraph_.poses_.size()]=node;
     
     //Update the new keyframe pose using thew best estimate from the optimized pose graph
-    newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
-    node.q = newKeyframe->T_WS.q();
-    node.p = newKeyframe->T_WS.r();
+    //newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+    node.q = poseGraph_.currentKeyframeT_WSo.q();
+    node.p = poseGraph_.currentKeyframeT_WSo.r();
     //Add this node to the pose graph
     poseGraph_.nodes_[poseGraph_.poses_.size()]=node;
 
@@ -1159,7 +1159,7 @@ void ThreadedKFVio::keyframeProcessorLoop() {
 
         //update current position and position of new keyframe. 
         poseGraph_.currentKeyframeT_WSo= okvis::kinematics::Transformation(poseGraph_.nodes_[poseGraph_.poses_.size()].p,poseGraph_.nodes_[poseGraph_.poses_.size()].q);
-        newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+        //newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
 
         //std::cout << "LOOP CLOSURE: " << pnpInliers.size()/(float)newFeaturesFinal.size() << "%% inliers" << std::endl;
         //poseGraph_.posesSinceLastLoop_=0;
