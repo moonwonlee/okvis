@@ -6,8 +6,6 @@
 #include <okvis/Parameters.hpp>
 #include <okvis/MultiFrame.hpp>
 #include <okvis/FrameTypedefs.hpp>
-#include "point_cloud.hpp"
-#include "correspondence_ransac.hpp"
 #include "glog/logging.h"
 #include "pose_graph_3d_error_term.h"
 #include "types.h"

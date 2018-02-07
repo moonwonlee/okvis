@@ -927,26 +927,31 @@ void ThreadedKFVio::optimizationLoop() {
 // Will probably change this to do the actual pose graph processing at some point
 void ThreadedKFVio::keyframeProcessorLoop() {
   for(;;) {
+    //Wait for new keyframe
     PoseGraph::KeyframeData::Ptr newKeyframe;
     if(keyframeData_.PopBlocking(&newKeyframe) == false)
       return;
 
+    //All of the below should be moved to the pose graph.hpp file
+    //compute most optimized location of the current keyframe
     poseGraph_.currentKeyframeT_WSo = poseGraph_.currentKeyframeT_WSo*newKeyframe->T_SoSn;
 
+    //This is only for debugging purposes
     Pose3dNode node;
     node.q = newKeyframe->T_WS.q();
     node.p = newKeyframe->T_WS.r();
-
     poseGraph_.originalNodes_[poseGraph_.poses_.size()]=node;
     
+    //Update the new keyframe pose using thew best estimate from the optimized pose graph
     newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
     node.q = newKeyframe->T_WS.q();
     node.p = newKeyframe->T_WS.r();
-
+    //Add this node to the pose graph
     poseGraph_.nodes_[poseGraph_.poses_.size()]=node;
 
+    //As long as this is not the first pose
     if(poseGraph_.poses_.size()>0){
-
+      //add constraint to pose graph between this pose and previous pose
       Pose3dNode newDiffConstraintNode;
       newDiffConstraintNode.q = newKeyframe->T_SoSn.q();
       newDiffConstraintNode.p = newKeyframe->T_SoSn.r();
@@ -958,6 +963,9 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       newDiffConstraint.information = Eigen::Matrix<double,6,6>::Identity();
       poseGraph_.constraints_.push_back(newDiffConstraint);
 
+      //I also include a "gravity constraint" 
+      //This represents the fact that the tilt and roll estimates are bounded due to 
+      //the presence of an accelerometer
       GravityNode newGravityConstraint;
       newGravityConstraint.g = newKeyframe->T_WS.q()*Eigen::Vector3d(0,0,1);
       newGravityConstraint.id = poseGraph_.poses_.size();
@@ -966,12 +974,15 @@ void ThreadedKFVio::keyframeProcessorLoop() {
 
     }
 
+    //These are for debugging purposes
     poseGraph_.OutputPoses("poses.txt");
     poseGraph_.OutputPoses("orig_poses.txt", poseGraph_.originalNodes_);
 
+    //This publishes the current pose for display purposes. Need to replace with full path publisher
     if (stateCallback_)
       stateCallback_(okvis::Time(),poseGraph_.currentKeyframeT_WSo);
 
+    //Get feature points  
     std::vector<cv::KeyPoint> points;
     points.reserve(newKeyframe->observations.size());
     for (size_t k = 0; k < newKeyframe->observations.size(); ++k) {
@@ -983,11 +994,9 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       }
       points.emplace_back(kp);
     }
-    //std::cout<< "points: " << points.size() << " kp: " << newKeyframe->keyFrames->numKeypoints(0) << std::endl;
-    
-    //detect orb descriptors
-    //later will just use brisk descriptors
 
+    //detect orb descriptors
+    //later will just use brisk descriptors, but need to create proper DBoW2 templates first
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     orb->compute(newKeyframe->keyFrames->image(0),points,newKeyframe->descriptors);
 
@@ -1010,78 +1019,30 @@ void ThreadedKFVio::keyframeProcessorLoop() {
     if(poseGraph_.posesSinceLastLoop_<20){
       //20 is the min number of keyframes before we want to consider a loop closure
       //this prevents us from trying to close the loop wuth very nearby frames
-      //std::cout<< "Adding To Database" << std::endl << std::flush;
       poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(newKeyframe->bowVec);
-      //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
       poseGraph_.poses_.push_back(newKeyframe);
       poseGraph_.posesSinceLastLoop_++;
       continue;
     }
 
-    //std::cout<< "Querying Database" << std::endl << std::flush;
     DBoW2::QueryResults qret;
+    //get best result from database. Don't consider the 20 most recent images
+    //should experiment with getting top 3 or top 5 results from database
     poseGraph_.db_->query(newKeyframe->bowVec,qret,1,poseGraph_.lastEntry_-20);
+    //compute similarity score to previous image
+    //this is necessary as the score will depend on the number and type of features in the image
+    //see DBoW2 paper for more details
     float baseScore = poseGraph_.vocab_->score(newKeyframe->bowVec,poseGraph_.poses_[poseGraph_.lastEntry_]->bowVec);
-    //std::cout<< "BaseScore: " << baseScore << std::endl << std::flush;
     if(qret.size()>0 && baseScore>0.1 && qret[0].Score/baseScore>0.75){ 
       //.01 is min similarity to previous frame,
       //.75 is required similarity of matched frame relative to previous frame
       //that is, the matched frame must be at least 75% as similar to the current
       //frame as the current frame is to the previous frame
 
+      //if the matched frame is similar enough, attempt to compute SE3 transform
       PoseGraph::KeyframeData::Ptr matchedFrame = poseGraph_.poses_[qret[0].Id];
-      /*
-      //match features
-      cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
-      std::vector<cv::DMatch> matches;
-      
-      matcher->match(newKeyframe->descriptors,matchedFrame->descriptors,matches);
-      //std::cout<< "points: " << points.size() << " kp: " << newKeyframe->keyFrames->numKeypoints(0) << std::endl;
 
-      //convert to pointcloud
-      PointCloud src,tgt;
-      //new keyframe first
-      src.reserve(points.size());
-      int j=0;
-      for(size_t k = 0; k < newKeyframe->observations.size(); ++k){
-        src.emplace_back(newKeyframe->observations[k].landmark_C.head(3));
-      }
-      //matched keyframe
-      tgt.reserve(matchedFrame->observations.size());
-      for(size_t k = 0; k < matchedFrame->observations.size(); ++k){
-        tgt.emplace_back(matchedFrame->observations[k].landmark_C.head(3));
-      }
-
-      //convert dmatch vector to correspondance vector
-      std::vector<int> correspondences(matches.size());
-      for(size_t j =0; j<matches.size(); j++){
-        correspondences[matches[j].queryIdx]=matches[j].trainIdx;
-      }
-
-      //Make confidence vector for ransac
-      std::vector<float> confidence(correspondences.size());
-      for(int j =0; j<correspondences.size(); j++){
-        confidence[j]=RANSAC_THRESHOLD*std::min(src[j].norm(),5.0);
-        //5.0 is the cutoff distance in meters for which
-        //we want to scale the error by
-        //this should be based off stereo baseline 
-        //or alternatively, imu accuracy for monocular
-      }
-
-      //compute transform using ransac
-      Eigen::Affine3d transform_estimate;
-      std::vector<bool> inliers;
-      int num_inliers;
-      CorrespondenceRansac::getInliersWithTransform(
-        src,tgt, correspondences, RANSAC_POINTS, 
-        confidence, RANSAC_ITERATIONS, num_inliers, 
-        inliers, transform_estimate);
-
-      //compute final transform
-      CorrespondenceRansac::getFinalTransform(
-        src, tgt, correspondences, inliers,
-        transform_estimate);
-*/
+      //get keypoints from frame
       std::vector<cv::KeyPoint> matchedPoints;
       matchedPoints.reserve(matchedFrame->observations.size());
       for (size_t k = 0; k < matchedFrame->observations.size(); ++k) {
@@ -1094,6 +1055,7 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         matchedPoints.emplace_back(kp);
       }
 
+      //match them to the current frame using optical flow 
       std::vector<cv::Point2f> matchedFeatures, newFeatures, newFeaturesFinal;
       okvis::keypoints_to_features(matchedPoints, matchedFeatures);
 
@@ -1106,6 +1068,8 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01),
         cv::OPTFLOW_LK_GET_MIN_EIGENVALS, 1e-4);
 
+      //again only for debugging
+      //creates image showing matches between the two frames
       cv::Mat outImg(matchedFrame->keyFrames->image(0).rows,
         matchedFrame->keyFrames->image(0).cols+newKeyframe->keyFrames->image(0).cols, CV_8UC1);
       cv::Mat left(outImg, cv::Rect(0,0,matchedFrame->keyFrames->image(0).cols,matchedFrame->keyFrames->image(0).rows));
@@ -1116,7 +1080,10 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         if(valid[i])
           line(outImg, matchedFeatures[i],cv::Point2f(newFeatures[i].x+matchedFrame->keyFrames->image(0).cols,newFeatures[i].y),cv::Scalar(255,0,0));
       }
+      debugImages_.PushNonBlockingDroppingIfFull(outImg, 1);
 
+      //get the 3d position of each matched point
+      //and create new feature vector that only uses the points that were matched
       std::vector<cv::Point3f> matchedPoints3d;
       for (size_t k = 0; k < matchedFrame->observations.size(); ++k) {
         if(valid[k]){
@@ -1126,7 +1093,6 @@ void ThreadedKFVio::keyframeProcessorLoop() {
           newFeaturesFinal.push_back(newFeatures[k]);
         }
       }
-      std::cout << "finalFeatureSize:" << newFeaturesFinal.size() << std::endl;
 
       //get intrinsics and distortion coeffs from fame
       Eigen::VectorXd full_intrinsics;
@@ -1144,6 +1110,8 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       distCoeffs.at<double>(2) = full_intrinsics[6];
       distCoeffs.at<double>(3) = full_intrinsics[7];
 
+      //compute the 3d position of the new keyframe relative to the matched frame
+      //we will use ransac to determine which points are inliers
       cv::Mat rvec(3,1,cv::DataType<double>::type);
       cv::Mat tvec(3,1,cv::DataType<double>::type);
 
@@ -1152,6 +1120,7 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         cameraMatrix, distCoeffs, rvec, tvec, false, 100, 2.0,
         0.5,pnpInliers);
 
+      //convert to eigen transform
       cv::Mat R; 
       cv::Rodrigues(rvec,R);
       tvec= -R*tvec;
@@ -1163,26 +1132,14 @@ void ThreadedKFVio::keyframeProcessorLoop() {
       cv::cv2eigen(tvec,trans);
       Eigen::Affine3d transform_estimate = Eigen::Translation3d(trans)*Eigen::Quaterniond(rot);
 
-      //std::vector<char> disp_inliers(newFeaturesFinal.size());
-      //for(int i=0; i<pnpInliers.size(); i++){
-      //  disp_inliers[pnpInliers[i]] = 1;
-      //}
-
-      //cv::Mat outImg;
-      //cv::drawMatches(newKeyframe->keyFrames->image(0),points,
-      //  matchedFrame->keyFrames->image(0),matchedPoints,matches,outImg,
-      //  cv::Scalar::all(-1), cv::Scalar::all(-1), 
-      //  disp_inliers, cv::DrawMatchesFlags::DEFAULT);
-
-      debugImages_.PushNonBlockingDroppingIfFull(outImg, 1);
-
-
+      //check if transform is valid, meaning we were able to compute
+      //a transform that enough points agreed upon
       if(pnpInliers.size()/(float)newFeaturesFinal.size()>0.301){
-        okvis::kinematics::Transformation okvis_estimate(transform_estimate.matrix());
-        //this needs to be updated to the T_WS of the pose from the last node in the optimized pose graph. After optimization
-        //poseGraph_.currentKeyframeT_WSo= matchedFrame->T_WS*okvis_estimate;
-        //newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
+        //.301 was experimentally determined to give good results
+        //it is the % required inliers for the loop closure to be good
 
+        //if succesful add a constaint to the pose graph
+        okvis::kinematics::Transformation okvis_estimate(transform_estimate.matrix());
         Pose3dNode newConstraintNode;
         newConstraintNode.q = okvis_estimate.q();
         newConstraintNode.p = okvis_estimate.r();
@@ -1193,27 +1150,26 @@ void ThreadedKFVio::keyframeProcessorLoop() {
         newConstraint.information = Eigen::Matrix<double,6,6>::Identity()/4;
 
         poseGraph_.constraints_.push_back(newConstraint);
+
+        //perform optimization of pose graph. 
         ::ceres::Problem problem;
         poseGraph_.BuildOptimizationProblem(&problem);
         poseGraph_.SolveOptimizationProblem(&problem);
         poseGraph_.OutputPoses("poses.txt");
 
+        //update current position and position of new keyframe. 
         poseGraph_.currentKeyframeT_WSo= okvis::kinematics::Transformation(poseGraph_.nodes_[poseGraph_.poses_.size()].p,poseGraph_.nodes_[poseGraph_.poses_.size()].q);
         newKeyframe->T_WS = poseGraph_.currentKeyframeT_WSo;
-        //.301 was experimentally determined to give good results
-        //it is the % required inliers for the loop closure to be good
-        std::cout << "LOOP CLOSURE: " << pnpInliers.size()/(float)newFeaturesFinal.size() << "%% inliers" << std::endl;
+
+        //std::cout << "LOOP CLOSURE: " << pnpInliers.size()/(float)newFeaturesFinal.size() << "%% inliers" << std::endl;
         //poseGraph_.posesSinceLastLoop_=0;
       }
     }
 
+    //add keyframe to graph
     poseGraph_.lastEntry_ = newKeyframe->id = poseGraph_.db_->add(newKeyframe->bowVec);
-    //std::cout << "Added Keyframe: " << poseGraph_.lastEntry_ << std::endl;
     poseGraph_.poses_.push_back(newKeyframe);
     poseGraph_.posesSinceLastLoop_++;
-
-
-    //LOG(WARNING) << "new keyframe detected";
   }
 }
 
