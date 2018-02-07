@@ -51,9 +51,6 @@
 #include <okvis/MultiFrame.hpp>
 #include <brisk/internal/hamming.h>
 
-#undef min
-#undef max
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

@@ -47,8 +47,6 @@
 #include <okvis/cameras/NCameraSystem.hpp>
 #include <okvis/assert_macros.hpp>
 
-#undef min
-#undef max
 
 /**
  * \brief Namespace for classes extending the OpenGV library.

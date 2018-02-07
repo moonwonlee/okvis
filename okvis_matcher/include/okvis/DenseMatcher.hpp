@@ -50,9 +50,6 @@
 #include <okvis/assert_macros.hpp>
 #include "ThreadPool.hpp"
 
-#undef min
-#undef max
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

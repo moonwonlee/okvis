@@ -49,9 +49,6 @@
 #include <okvis/MultiFrame.hpp>
 #include <okvis/assert_macros.hpp>
 
-#undef min
-#undef max
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

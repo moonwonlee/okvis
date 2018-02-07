@@ -49,9 +49,6 @@
 #include <okvis/timing/Timer.hpp>
 #include <okvis/DenseMatcher.hpp>
 
-#undef min
-#undef max
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

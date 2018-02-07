@@ -35,9 +35,6 @@
 #include <okvis/assert_macros.hpp>
 #include <stdio.h>
 
-#undef min
-#undef max
-
 namespace okvis{
 namespace timing {
   

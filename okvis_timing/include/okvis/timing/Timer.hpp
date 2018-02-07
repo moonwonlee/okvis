@@ -58,6 +58,7 @@
 
 #ifdef _WIN32
 #define OKVIS_USE_HIGH_PERF_TIMER
+#define NOMINMAX
 #include <windows.h>
 #endif
 
