@@ -568,8 +568,8 @@ void ThreadedKFVio::matchingLoop() {
               estimator_.getLandmark(it.landmarkId, landmark);
               //landmark in camera coords
               it.landmark_C = keyframeT_CW*landmark.point;
-              //if (estimator_.isLandmarkInitialized(it.landmarkId))
-              keyFrameDataPtr->observations.push_back(it);
+              if (estimator_.isLandmarkInitialized(it.landmarkId))
+                keyFrameDataPtr->observations.push_back(it);
             }
           }
           okvis::kinematics::Transformation lastT_SW = keyFrameDataPtr->T_WS.inverse();

@@ -232,11 +232,12 @@ class PoseGraph {
       //I also include a "gravity constraint" 
       //This represents the fact that the tilt and roll estimates are bounded due to 
       //the presence of an accelerometer
-      GravityNode newGravityConstraint;
+      //---This may have a bug, disabling until a test can confirm
+      /*GravityNode newGravityConstraint;
       newGravityConstraint.g = kf->T_WS.q()*Eigen::Vector3d(0,0,1);
       newGravityConstraint.id = poses_.size();
       newGravityConstraint.information = Eigen::Matrix3d::Identity();
-      gravity_.push_back(newGravityConstraint);
+      gravity_.push_back(newGravityConstraint);*/
 
     }
 
@@ -331,21 +332,6 @@ class PoseGraph {
         cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01),
         cv::OPTFLOW_LK_GET_MIN_EIGENVALS, 1e-4);
 
-      //again only for debugging
-      //creates image showing matches between the two frames
-      /*
-      cv::Mat outImg(matchedFrame->keyFrames->image(0).rows,
-        matchedFrame->keyFrames->image(0).cols+kf->keyFrames->image(0).cols, CV_8UC1);
-      cv::Mat left(outImg, cv::Rect(0,0,matchedFrame->keyFrames->image(0).cols,matchedFrame->keyFrames->image(0).rows));
-      cv::Mat right(outImg, cv::Rect(matchedFrame->keyFrames->image(0).cols,0,kf->keyFrames->image(0).cols,matchedFrame->keyFrames->image(0).rows));
-      matchedFrame->keyFrames->image(0).copyTo(left);
-      kf->keyFrames->image(0).copyTo(right);
-      for(int i=0; i <matchedFeatures.size(); i++){
-        if(valid[i])
-          line(outImg, matchedFeatures[i],cv::Point2f(newFeatures[i].x+matchedFrame->keyFrames->image(0).cols,newFeatures[i].y),cv::Scalar(255,0,0));
-      }
-      debugImages_.PushNonBlockingDroppingIfFull(outImg, 1);*/
-
       //get the 3d position of each matched point
       //and create new feature vector that only uses the points that were matched
       std::vector<cv::Point3f> matchedPoints3d;
@@ -380,9 +366,13 @@ class PoseGraph {
       cv::Mat tvec(3,1,cv::DataType<double>::type);
 
       std::vector<int> pnpInliers; 
-      solvePnPRansac(matchedPoints3d, newFeaturesFinal, 
-        cameraMatrix, distCoeffs, rvec, tvec, false, 100, 2.0,
-        0.5,pnpInliers);
+
+      bool pnp_success = false;
+      if(newFeaturesFinal.size()>30){
+        pnp_success = solvePnPRansac(matchedPoints3d, newFeaturesFinal, 
+          cameraMatrix, distCoeffs, rvec, tvec, false, 100, 2.0,
+          0.5,pnpInliers);
+      }
 
       //convert to eigen transform
       cv::Mat R; 
@@ -398,7 +388,7 @@ class PoseGraph {
 
       //check if transform is valid, meaning we were able to compute
       //a transform that enough points agreed upon
-      if(pnpInliers.size()/(float)newFeaturesFinal.size()>0.301){
+      if(pnp_success && pnpInliers.size()/(float)newFeaturesFinal.size()>0.301){
         //.301 was experimentally determined to give good results
         //it is the % required inliers for the loop closure to be good
 
