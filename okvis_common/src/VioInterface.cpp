@@ -93,10 +93,16 @@ void VioInterface::setFullStateCallbackWithExtrinsics(
   fullStateCallbackWithExtrinsics_ = fullStateCallbackWithExtrinsics;
 }
 
-// Set the fullStateCallbackWithExtrinsics to be called every time a new state is estimated.
+// Set the landmarksCallback to be called every time a new state is estimated.
 void VioInterface::setLandmarksCallback(
     const LandmarksCallback & landmarksCallback) {
   landmarksCallback_ = landmarksCallback;
+}
+
+// Set the pathCallback to be called every time a new keyframe is processed.
+void VioInterface::setPathCallback(
+    const PathCallback & pathCallback) {
+  pathCallback_ = pathCallback;
 }
 
 // Set the blocking variable that indicates whether the addMeasurement() functions

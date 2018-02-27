@@ -85,6 +85,8 @@ class VioInterface {
   typedef std::function<
       void(const okvis::Time &, const okvis::MapPointVector &,
            const okvis::MapPointVector &)> LandmarksCallback;
+  typedef std::function<
+      void(const std::vector<Eigen::Vector3d> &)> PathCallback;
 
   VioInterface();
   virtual ~VioInterface();
@@ -288,6 +290,13 @@ class VioInterface {
   ///        landmarksVector contains all 3D-landmarks with id.
   virtual void setLandmarksCallback(
       const LandmarksCallback & landmarksCallback);
+  /// \brief Set the PathCallback to be called every time a new keyframe is processed.
+  ///        When an implementing class has an estimate, they can call:
+  ///        pathCallback_( pathVector );
+  ///        pathVector contains all optimized keyframe positions.
+  virtual void setPathCallback(
+      const PathCallback & pathCallback);
+
 
   /**
    * \brief Set the blocking variable that indicates whether the addMeasurement() functions
@@ -312,6 +321,7 @@ class VioInterface {
   FullStateCallback fullStateCallback_; ///< Full state callback function.
   FullStateCallbackWithExtrinsics fullStateCallbackWithExtrinsics_; ///< Full state and extrinsics callback function.
   LandmarksCallback landmarksCallback_; ///< Landmarks callback function.
+  PathCallback pathCallback_; ///< Path callback function.
   std::shared_ptr<std::fstream> csvImuFile_;  ///< IMU CSV file.
   std::shared_ptr<std::fstream> csvPosFile_;  ///< Position CSV File.
   std::shared_ptr<std::fstream> csvMagFile_;  ///< Magnetometer CSV File

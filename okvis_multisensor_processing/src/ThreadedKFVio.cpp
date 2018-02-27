@@ -932,7 +932,12 @@ void ThreadedKFVio::keyframeProcessorLoop() {
     if(keyFrameData_.PopBlocking(&newKeyframe) == false)
       return;
     //Add keyframe to pose graph and perform optimization if needed
-    poseGraph_.processKeyFrame(newKeyframe);
+    std::vector<Eigen::Vector3d> optimized_path;
+    poseGraph_.processKeyFrame(newKeyframe, optimized_path);
+
+    if(pathCallback_){
+      pathCallback_(optimized_path);
+    }
     //this frame should also publish poses and 
     //indicate when pose graph needs to be re-optimized
 

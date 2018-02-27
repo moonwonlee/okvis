@@ -197,7 +197,7 @@ class PoseGraph {
     cv::Mat descriptors;
   };
 
-  void processKeyFrame(KeyFrameData::Ptr kf){
+  void processKeyFrame(KeyFrameData::Ptr kf, std::vector<Eigen::Vector3d>& path_out){
  //All of the below should be moved to the pose graph.hpp file
     //compute most optimized location of the current keyframe
     currentKeyframeT_WSo = currentKeyframeT_WSo*kf->T_SoSn;
@@ -227,6 +227,7 @@ class PoseGraph {
       newDiffConstraint.id_begin = poses_.size()-1;
       newDiffConstraint.id_end = poses_.size();
       newDiffConstraint.information = Eigen::Matrix<double,6,6>::Identity();
+      newDiffConstraint.information.block<3,3>(3,3) = Eigen::Matrix<double,3,3>::Identity()*100;
       constraints_.push_back(newDiffConstraint);
 
       //I also include a "gravity constraint" 
@@ -242,9 +243,18 @@ class PoseGraph {
     }
 
     //These are for debugging purposes
-    OutputPoses("poses.txt");
-    OutputPoses("orig_poses.txt", originalNodes_);
-
+    //OutputPoses("poses.txt");
+    //OutputPoses("orig_poses.txt", originalNodes_);
+    path_out.clear();
+    for (std::map<int, Pose3dNode, std::less<int>,
+                  Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >::
+             const_iterator poses_iter = nodes_.begin();
+         poses_iter != nodes_.end(); ++poses_iter) {
+      const std::map<int, Pose3dNode, std::less<int>,
+                     Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >::
+          value_type& pair = *poses_iter;
+      path_out.push_back(pair.second.p);    
+    }
 
     //Get feature points  
     std::vector<cv::KeyPoint> points;
@@ -409,7 +419,16 @@ class PoseGraph {
         ::ceres::Problem problem;
         BuildOptimizationProblem(&problem);
         SolveOptimizationProblem(&problem);
-        OutputPoses("poses.txt");
+        path_out.clear();
+        for (std::map<int, Pose3dNode, std::less<int>,
+                      Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >::
+                 const_iterator poses_iter = nodes_.begin();
+             poses_iter != nodes_.end(); ++poses_iter) {
+          const std::map<int, Pose3dNode, std::less<int>,
+                         Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >::
+              value_type& pair = *poses_iter;
+          path_out.push_back(pair.second.p);    
+        }
 
         //update current position and position of new keyframe. 
         currentKeyframeT_WSo= okvis::kinematics::Transformation(nodes_[poses_.size()].p,nodes_[poses_.size()].q);
