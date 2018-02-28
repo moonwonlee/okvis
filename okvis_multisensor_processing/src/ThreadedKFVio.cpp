@@ -573,7 +573,7 @@ void ThreadedKFVio::matchingLoop() {
             }
           }
           okvis::kinematics::Transformation lastT_SW = keyFrameDataPtr->T_WS.inverse();
-          if(!keyFrameData_.PushNonBlockingDroppingIfFull(keyFrameDataPtr, 1))
+          if(keyFrameData_.TryPushNonBlockingDroppingIfFull(keyFrameDataPtr, 1))
             poseGraph_.lastKeyframeT_SoW = lastT_SW;
         } else{
           keyframeSet_=true;

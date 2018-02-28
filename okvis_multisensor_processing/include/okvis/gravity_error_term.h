@@ -19,7 +19,7 @@ class PoseGraphGravityTerm {
     Eigen::Map<const Eigen::Quaternion<T> > q_a(q_a_ptr);
 
     // get the estimated gravity vector, given current estimate of rotation
-    Eigen::Matrix<T, 3, 1> g_estimated = q_a * Eigen::Vector3d(0,0,1).template cast<T>();
+    Eigen::Matrix<T, 3, 1> g_estimated = q_a.inverse() * Eigen::Vector3d(0,0,1).template cast<T>();
 
     // Compute the residuals to the original gravity vector
     Eigen::Map<Eigen::Matrix<T, 3, 1> > residuals(residuals_ptr);

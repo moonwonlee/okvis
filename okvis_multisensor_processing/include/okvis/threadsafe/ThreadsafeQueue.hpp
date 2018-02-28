@@ -174,6 +174,21 @@ class ThreadSafeQueue {
     return result;
   }
 
+  /// \brief Push to the queue. If full, do not push.
+  /// \param[in] value New entry in queue.
+  /// \param[in] max_queue_size Maximum queue size.
+  /// \return True if item was successfully pushed. false if full.
+  bool TryPushNonBlockingDroppingIfFull(const QueueType& value,
+                                     size_t max_queue_size) {
+    std::unique_lock<std::mutex> lck (mutex_);
+    if (queue_.size() >= max_queue_size) {
+      return false;
+    }
+    queue_.push(value);
+    condition_empty_.notify_one();  // Signal that data is available.
+    return true;
+  }
+
   /**
    * @brief Get the oldest entry still in the queue. Blocking if queue is empty.
    * @param[out] value Oldest entry in queue.

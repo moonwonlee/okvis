@@ -235,7 +235,7 @@ class PoseGraph {
       //the presence of an accelerometer
       //---This may have a bug, disabling until a test can confirm
       /*GravityNode newGravityConstraint;
-      newGravityConstraint.g = kf->T_WS.q()*Eigen::Vector3d(0,0,1);
+      newGravityConstraint.g = kf->T_WS.q().inverse()*Eigen::Vector3d(0,0,1);
       newGravityConstraint.id = poses_.size();
       newGravityConstraint.information = Eigen::Matrix3d::Identity();
       gravity_.push_back(newGravityConstraint);*/
