@@ -262,6 +262,10 @@ struct Visualization {
 
 enum class FrameName { B, S, W, Wc };
 
+struct LoopClosureParameters {
+  bool enabled;
+};
+
 /// @brief Some publishing parameters.
 struct PublishingParameters {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -284,6 +288,8 @@ struct VioParameters {
   SensorsInformation sensors_information; ///< Information on camera and IMU setup.
   ExtrinsicsEstimationParameters camera_extrinsics; ///< Camera extrinsic estimation parameters.
   okvis::cameras::NCameraSystem nCameraSystem;  ///< Camera configuration.
+  okvis::cameras::NCameraSystem secondaryCameraSystem;  ///< Camera configuration for additional unused cameras
+  LoopClosureParameters loopClosureParameters;
   ImuParameters imu;  ///< IMU parameters
   MagnetometerParameters magnetometer;  ///< Magnetometer parameters.
   PositionSensorParameters position;  ///< Position sensor parameters.

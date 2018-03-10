@@ -55,7 +55,7 @@ static const okvis::Duration temporal_imu_data_overlap(0.02);  // overlap of imu
 #ifdef USE_MOCK
 // Constructor for gmock.
 ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBackendInterface& estimator,
-    okvis::MockVioFrontendInterface& frontend)
+    okvis::MockVioFrontendInterface& frontend, std::string vocab_file_path)
     : speedAndBiases_propagated_(okvis::SpeedAndBias::Zero()),
       imu_params_(parameters.imu),
       repropagationNeeded_(false),
@@ -67,12 +67,12 @@ ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBac
       parameters_(parameters),
       maxImuInputQueueSize_(60),
       keyframeSet_(false),
-      poseGraph_("ORBvoc.yml") {
+      poseGraph_(vocab_file_path, parameters) {
   init();
 }
 #else
 // Constructor.
-ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters)
+ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters,std::string vocab_file_path)
     : speedAndBiases_propagated_(okvis::SpeedAndBias::Zero()),
       imu_params_(parameters.imu),
       repropagationNeeded_(false),
@@ -86,7 +86,7 @@ ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters)
           2 * max_camera_input_queue_size * parameters.imu.rate
               / parameters.sensors_information.cameraRate), 
       keyframeSet_(false),
-      poseGraph_("ORBvoc.yml") {
+      poseGraph_(vocab_file_path, parameters) {
   setBlocking(false);
   init();
 }

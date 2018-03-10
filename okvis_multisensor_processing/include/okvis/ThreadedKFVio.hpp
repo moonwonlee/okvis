@@ -102,14 +102,14 @@ class ThreadedKFVio : public VioInterface {
 
   /// \brief constructor for gmock
   ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBackendInterface& estimator,
-      okvis::MockVioFrontendInterface& frontend);
+      okvis::MockVioFrontendInterface& frontend, std::string vocab_file_path);
 
 #else
   /**
    * \brief Constructor.
    * \param parameters Parameters and settings.
    */
-  ThreadedKFVio(okvis::VioParameters& parameters);
+  ThreadedKFVio(okvis::VioParameters& parameters, std::string vocab_file_path);
 #endif
 
   /// \brief Destructor. This calls Shutdown() for all threadsafe queues and joins all threads.

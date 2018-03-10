@@ -46,7 +46,8 @@ inline void keypoints_to_features(const std::vector<cv::KeyPoint>& keypoints_in,
 class PoseGraph {
  public:
 
-  PoseGraph(std::string vocabPath):
+  PoseGraph(std::string vocabPath, okvis::VioParameters& parameters):
+  parameters_(parameters),
   posesSinceLastLoop_(0),
   lastKeyframeT_SoW(Eigen::Matrix4d::Identity()),
   currentKeyframeT_WSo(Eigen::Matrix4d::Identity()){
@@ -216,7 +217,7 @@ class PoseGraph {
     nodes_[poses_.size()]=node;
 
     //As long as this is not the first pose
-    if(poses_.size()>0){
+    if(poses_.size()>0 && parameters_.loopClosureParameters.enabled){
       //add constraint to pose graph between this pose and previous pose
       Pose3dNode newDiffConstraintNode;
       newDiffConstraintNode.q = kf->T_SoSn.q();
@@ -256,6 +257,9 @@ class PoseGraph {
       path_out.push_back(pair.second.p);    
     }
 
+    if(!parameters_.loopClosureParameters.enabled)
+      return;
+    
     //Get feature points  
     std::vector<cv::KeyPoint> points;
     points.reserve(kf->observations.size());
@@ -460,6 +464,7 @@ class PoseGraph {
   VectorOfGravityConstraints gravity_;
   MapOfPoses nodes_;
   MapOfPoses originalNodes_;
+  okvis::VioParameters parameters_;
 
 private: 
 

@@ -132,6 +132,13 @@ void VioParametersReader::readConfigFile(const std::string& filename) {
   OKVIS_ASSERT_TRUE(Exception, success,
                     "'useDriver' parameter missing in configuration file.");
 
+  // use loop closure detection
+  // if parameter not found set to false to preserve backwords compatability
+  success = parseBoolean(file["enableLoopClosureDetection"],
+                         vioParameters_.loopClosureParameters.enabled);
+  if(!success)
+    vioParameters_.loopClosureParameters.enabled=false;
+
   // display images?
   success = parseBoolean(file["displayImages"],
                          vioParameters_.visualization.displayImages);
@@ -394,6 +401,99 @@ void VioParametersReader::readConfigFile(const std::string& filename) {
     }
     ++camIdx;
   }
+
+//getCalibrationViaConfig
+  {
+    // additional camera calibration
+    std::vector<CameraCalibration,Eigen::aligned_allocator<CameraCalibration>> additional_calibrations;
+    if(getCalibrationViaConfig(additional_calibrations, file["additional_cameras"])){
+      size_t camIdx = 0;
+      for (size_t i = 0; i < additional_calibrations.size(); ++i) {
+
+        std::shared_ptr<const okvis::kinematics::Transformation> T_SC_okvis_ptr(
+              new okvis::kinematics::Transformation(additional_calibrations[i].T_SC.r(),
+                                                    additional_calibrations[i].T_SC.q().normalized()));
+
+        if (strcmp(additional_calibrations[i].distortionType.c_str(), "equidistant") == 0) {
+          vioParameters_.secondaryCameraSystem.addCamera(
+              T_SC_okvis_ptr,
+              std::shared_ptr<const okvis::cameras::CameraBase>(
+                  new okvis::cameras::PinholeCamera<
+                      okvis::cameras::EquidistantDistortion>(
+                      additional_calibrations[i].imageDimension[0],
+                      additional_calibrations[i].imageDimension[1],
+                      additional_calibrations[i].focalLength[0],
+                      additional_calibrations[i].focalLength[1],
+                      additional_calibrations[i].principalPoint[0],
+                      additional_calibrations[i].principalPoint[1],
+                      okvis::cameras::EquidistantDistortion(
+                        additional_calibrations[i].distortionCoefficients[0],
+                        additional_calibrations[i].distortionCoefficients[1],
+                        additional_calibrations[i].distortionCoefficients[2],
+                        additional_calibrations[i].distortionCoefficients[3])/*, id ?*/)),
+              okvis::cameras::NCameraSystem::Equidistant/*, computeOverlaps ?*/);
+          std::stringstream s;
+          s << additional_calibrations[i].T_SC.T();
+          LOG(INFO) << "Equidistant pinhole camera " << camIdx
+                    << " with T_SC=\n" << s.str();
+        } else if (strcmp(additional_calibrations[i].distortionType.c_str(), "radialtangential") == 0
+                   || strcmp(additional_calibrations[i].distortionType.c_str(), "plumb_bob") == 0) {
+          vioParameters_.secondaryCameraSystem.addCamera(
+              T_SC_okvis_ptr,
+              std::shared_ptr<const okvis::cameras::CameraBase>(
+                  new okvis::cameras::PinholeCamera<
+                      okvis::cameras::RadialTangentialDistortion>(
+                      additional_calibrations[i].imageDimension[0],
+                      additional_calibrations[i].imageDimension[1],
+                      additional_calibrations[i].focalLength[0],
+                      additional_calibrations[i].focalLength[1],
+                      additional_calibrations[i].principalPoint[0],
+                      additional_calibrations[i].principalPoint[1],
+                      okvis::cameras::RadialTangentialDistortion(
+                        additional_calibrations[i].distortionCoefficients[0],
+                        additional_calibrations[i].distortionCoefficients[1],
+                        additional_calibrations[i].distortionCoefficients[2],
+                        additional_calibrations[i].distortionCoefficients[3])/*, id ?*/)),
+              okvis::cameras::NCameraSystem::RadialTangential/*, computeOverlaps ?*/);
+          std::stringstream s;
+          s << additional_calibrations[i].T_SC.T();
+          LOG(INFO) << "Radial tangential pinhole camera " << camIdx
+                    << " with T_SC=\n" << s.str();
+        } else if (strcmp(additional_calibrations[i].distortionType.c_str(), "radialtangential8") == 0
+                   || strcmp(additional_calibrations[i].distortionType.c_str(), "plumb_bob8") == 0) {
+          vioParameters_.secondaryCameraSystem.addCamera(
+              T_SC_okvis_ptr,
+              std::shared_ptr<const okvis::cameras::CameraBase>(
+                  new okvis::cameras::PinholeCamera<
+                      okvis::cameras::RadialTangentialDistortion8>(
+                      additional_calibrations[i].imageDimension[0],
+                      additional_calibrations[i].imageDimension[1],
+                      additional_calibrations[i].focalLength[0],
+                      additional_calibrations[i].focalLength[1],
+                      additional_calibrations[i].principalPoint[0],
+                      additional_calibrations[i].principalPoint[1],
+                      okvis::cameras::RadialTangentialDistortion8(
+                        additional_calibrations[i].distortionCoefficients[0],
+                        additional_calibrations[i].distortionCoefficients[1],
+                        additional_calibrations[i].distortionCoefficients[2],
+                        additional_calibrations[i].distortionCoefficients[3],
+                        additional_calibrations[i].distortionCoefficients[4],
+                        additional_calibrations[i].distortionCoefficients[5],
+                        additional_calibrations[i].distortionCoefficients[6],
+                        additional_calibrations[i].distortionCoefficients[7])/*, id ?*/)),
+              okvis::cameras::NCameraSystem::RadialTangential8/*, computeOverlaps ?*/);
+          std::stringstream s;
+          s << additional_calibrations[i].T_SC.T();
+          LOG(INFO) << "Radial tangential 8 pinhole camera " << camIdx
+                    << " with T_SC=\n" << s.str();
+        } else {
+          LOG(ERROR) << "unrecognized distortion type " << additional_calibrations[i].distortionType;
+        }
+        ++camIdx;
+      }
+    }
+  }
+
 
   vioParameters_.sensors_information.imuIdx = 0;
 

@@ -333,7 +333,7 @@ int main(int argc, char **argv)
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
 
-  okvis::ThreadedKFVio okvis_estimator(parameters);
+  okvis::ThreadedKFVio okvis_estimator(parameters, "ORBvoc.yml");
 
   PoseViewer poseViewer;
   okvis_estimator.setFullStateCallback(
