@@ -932,11 +932,12 @@ void ThreadedKFVio::keyframeProcessorLoop() {
     if(keyFrameData_.PopBlocking(&newKeyframe) == false)
       return;
     //Add keyframe to pose graph and perform optimization if needed
-    std::vector<Eigen::Vector3d> optimized_path;
-    poseGraph_.processKeyFrame(newKeyframe, optimized_path);
+    std::vector<okvis::kinematics::Transformation> optimized_path;
+    bool loopClosure;
+    poseGraph_.processKeyFrame(newKeyframe, optimized_path, loopClosure);
 
     if(pathCallback_){
-      pathCallback_(optimized_path);
+      pathCallback_(newKeyframe->keyFrames->timestamp(), optimized_path, loopClosure);
     }
     //this frame should also publish poses and 
     //indicate when pose graph needs to be re-optimized
@@ -954,8 +955,8 @@ void ThreadedKFVio::publisherLoop() {
       return;
 
     // call all user callbacks
-    //if (stateCallback_ && !result.onlyPublishLandmarks)
-      //stateCallback_(result.stamp, result.T_WS);
+    if (stateCallback_ && !result.onlyPublishLandmarks)
+      stateCallback_(result.stamp, result.T_WS);
     if (fullStateCallback_ && !result.onlyPublishLandmarks)
       fullStateCallback_(result.stamp, result.T_WS, result.speedAndBiases,
                          result.omega_S);

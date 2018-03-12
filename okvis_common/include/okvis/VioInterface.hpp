@@ -86,7 +86,7 @@ class VioInterface {
       void(const okvis::Time &, const okvis::MapPointVector &,
            const okvis::MapPointVector &)> LandmarksCallback;
   typedef std::function<
-      void(const std::vector<Eigen::Vector3d> &)> PathCallback;
+      void(const okvis::Time &,const std::vector<okvis::kinematics::Transformation> &, bool)> PathCallback;
 
   VioInterface();
   virtual ~VioInterface();

@@ -198,8 +198,9 @@ class PoseGraph {
     cv::Mat descriptors;
   };
 
-  void processKeyFrame(KeyFrameData::Ptr kf, std::vector<Eigen::Vector3d>& path_out){
- //All of the below should be moved to the pose graph.hpp file
+  void processKeyFrame(KeyFrameData::Ptr kf, std::vector<okvis::kinematics::Transformation>& path_out, bool& loopClosure){
+
+    loopClosure=false;
     //compute most optimized location of the current keyframe
     currentKeyframeT_WSo = currentKeyframeT_WSo*kf->T_SoSn;
 
@@ -254,12 +255,12 @@ class PoseGraph {
       const std::map<int, Pose3dNode, std::less<int>,
                      Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >::
           value_type& pair = *poses_iter;
-      path_out.push_back(pair.second.p);    
+      path_out.push_back(okvis::kinematics::Transformation(pair.second.p,pair.second.q));  
     }
 
     if(!parameters_.loopClosureParameters.enabled)
       return;
-    
+
     //Get feature points  
     std::vector<cv::KeyPoint> points;
     points.reserve(kf->observations.size());
@@ -406,6 +407,8 @@ class PoseGraph {
         //.301 was experimentally determined to give good results
         //it is the % required inliers for the loop closure to be good
 
+        loopClosure=true;
+
         //if succesful add a constaint to the pose graph
         okvis::kinematics::Transformation okvis_estimate(transform_estimate.matrix());
         Pose3dNode newConstraintNode;
@@ -431,7 +434,7 @@ class PoseGraph {
           const std::map<int, Pose3dNode, std::less<int>,
                          Eigen::aligned_allocator<std::pair<const int, Pose3dNode> > >::
               value_type& pair = *poses_iter;
-          path_out.push_back(pair.second.p);    
+          path_out.push_back(okvis::kinematics::Transformation(pair.second.p,pair.second.q));    
         }
 
         //update current position and position of new keyframe. 
