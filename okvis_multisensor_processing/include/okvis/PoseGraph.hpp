@@ -51,10 +51,12 @@ class PoseGraph {
   posesSinceLastLoop_(0),
   lastKeyframeT_SoW(Eigen::Matrix4d::Identity()),
   currentKeyframeT_WSo(Eigen::Matrix4d::Identity()){
-      std::cout << "Loading Vocabulary From: " << vocabPath << std::endl;
-      vocab_.reset(new OrbVocabulary(vocabPath));
-      std::cout << "Vocabulary Size: " << vocab_->size() << std::endl;
-      db_.reset(new OrbDatabase(*vocab_));
+      if(parameters_.loopClosureParameters.enabled){
+        std::cout << "Loading Vocabulary From: " << vocabPath << std::endl;
+        vocab_.reset(new OrbVocabulary(vocabPath));
+        std::cout << "Vocabulary Size: " << vocab_->size() << std::endl;
+        db_.reset(new OrbDatabase(*vocab_));
+      }
   }
 
   void BuildOptimizationProblem(::ceres::Problem* problem){
