@@ -262,10 +262,12 @@ class MultiFrame
     return cameraSystem_.hasOverlap(cameraIndexSeenBy, cameraIndex);
   }
 
+  
+  std::vector<Frame, Eigen::aligned_allocator<Frame>> frames_;  ///< the individual frames
+
  protected:
   okvis::Time timestamp_;  ///< the frame timestamp
   uint64_t id_;  ///< the frame id
-  std::vector<Frame, Eigen::aligned_allocator<Frame>> frames_;  ///< the individual frames
   cameras::NCameraSystem cameraSystem_;  ///< the camera system
 };
 

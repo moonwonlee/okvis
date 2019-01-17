@@ -47,6 +47,9 @@ add_library(${PROJECT_NAME}
   include/okvis/FrameSynchronizer.hpp
   include/okvis/VioVisualizer.hpp
   include/okvis/threadsafe/ThreadsafeQueue.hpp
+  include/okvis/pose_graph_3d_error_term.hpp
+  include/okvis/gravity_error_term.hpp
+  include/okvis/types.hpp
   ../cmake/okvisConfig.hpp.in
   okvisConfig.hpp
 )

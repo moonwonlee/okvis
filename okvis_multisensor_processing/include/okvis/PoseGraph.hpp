@@ -7,9 +7,9 @@
 #include <okvis/MultiFrame.hpp>
 #include <okvis/FrameTypedefs.hpp>
 #include "glog/logging.h"
-#include "pose_graph_3d_error_term.h"
-#include "gravity_error_term.h"
-#include "types.h"
+#include "pose_graph_3d_error_term.hpp"
+#include "gravity_error_term.hpp"
+#include "types.hpp"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -53,9 +53,19 @@ class PoseGraph {
   currentKeyframeT_WSo(Eigen::Matrix4d::Identity()){
       if(parameters_.loopClosureParameters.enabled){
         std::cout << "Loading Vocabulary From: " << vocabPath << std::endl;
-        vocab_.reset(new OrbVocabulary(vocabPath));
+        vocab_.reset(new BRISKVocabulary());
+        //vocab_->load(vocabPath);
+        //vocab_->binarySave(vocabPath+std::string(".bn"));
+        //vocab_.reset(new BRISKVocabulary());
+        vocab_->binaryLoad(vocabPath);
+        //vocab_->binarySave(vocabPath+std::string(".tst"));
         std::cout << "Vocabulary Size: " << vocab_->size() << std::endl;
-        db_.reset(new OrbDatabase(*vocab_));
+        std::cout << "Initializing Database " << std::endl << std::flush;
+        db_.reset(new BRISKDatabase());
+
+        std::cout << "Adding Vocabulary " << std::endl << std::flush;
+        db_->setVocabulary(*vocab_);
+        std::cout << "Database Initialized: " << std::endl << std::flush;
       }
   }
 
@@ -201,7 +211,7 @@ class PoseGraph {
   };
 
   void processKeyFrame(KeyFrameData::Ptr kf, std::vector<okvis::kinematics::Transformation>& path_out, bool& loopClosure){
-
+    std::cout << "PROCESS KEYFRAME\n";
     loopClosure=false;
     //compute most optimized location of the current keyframe
     currentKeyframeT_WSo = currentKeyframeT_WSo*kf->T_SoSn;
@@ -269,6 +279,7 @@ class PoseGraph {
     for (size_t k = 0; k < kf->observations.size(); ++k) {
       cv::KeyPoint kp;
       kf->keyFrames->getCvKeypoint(0,kf->observations[k].keypointIdx,kp);
+      kf->descriptors=kf->keyFrames->frames_[0].descriptors_;
 
       if(!okvis::in_image(kp.pt,kf->keyFrames->image(0))){
         std::cout << "Point Not in Image\n";
@@ -276,17 +287,20 @@ class PoseGraph {
       points.emplace_back(kp);
     }
 
+
+
     //detect orb descriptors
     //later will just use brisk descriptors, but need to create proper DBoW2 templates first
-    cv::Ptr<cv::ORB> orb = cv::ORB::create();
-    orb->compute(kf->keyFrames->image(0),points,kf->descriptors);
+    //cv::Ptr<cv::ORB> orb = cv::ORB::create();
+    //orb->compute(kf->keyFrames->image(0),points,kf->descriptors);
 
     //if we can not compute orb descriptors for all points, do not use keyframe
     //this will not be an issue once we switch to brisk descriptors
-    if(points.size()!=kf->observations.size())
-      return;
+    //if(points.size()!=kf->observations.size())
+    //  return;
 
     //convert to DBoW descriptor format
+    std::cout << "Get DBoW descriptors\n" << std::flush;
     std::vector<cv::Mat> bowDesc;
     bowDesc.reserve(kf->descriptors.rows);
     for(int i=0; i<kf->descriptors.rows; i++){
@@ -294,7 +308,9 @@ class PoseGraph {
     } 
 
     //get BoW vector for keyframe 
+    std::cout << "Get DBoW vectors\n" << std::flush;
     vocab_->transform(bowDesc, kf->bowVec);
+    std::cout << "Tranformed\n" << std::flush;
     if(kf->bowVec.size()==0)
       return;
     if(posesSinceLastLoop_<20){
@@ -309,6 +325,8 @@ class PoseGraph {
     DBoW2::QueryResults qret;
     //get best result from database. Don't consider the 20 most recent images
     //should experiment with getting top 3 or top 5 results from database
+
+    std::cout << "Query database\n" << std::flush;
     db_->query(kf->bowVec,qret,1,lastEntry_-20);
     //compute similarity score to previous image
     //this is necessary as the score will depend on the number and type of features in the image
@@ -319,6 +337,7 @@ class PoseGraph {
       //.75 is required similarity of matched frame relative to previous frame
       //that is, the matched frame must be at least 75% as similar to the current
       //frame as the current frame is to the previous frame
+      std::cout << "LOOP CLOSURE" << std::endl << std::flush;
 
       //if the matched frame is similar enough, attempt to compute SE3 transform
       PoseGraph::KeyFrameData::Ptr matchedFrame = poses_[qret[0].Id];
@@ -455,8 +474,8 @@ class PoseGraph {
   }
 
 
-  std::unique_ptr<OrbVocabulary> vocab_;
-  std::unique_ptr<OrbDatabase> db_;
+  std::unique_ptr<BRISKVocabulary> vocab_;
+  std::unique_ptr<BRISKDatabase> db_;
   std::vector<KeyFrameData::Ptr> poses_;
 
   okvis::kinematics::Transformation lastKeyframeT_SoW;
