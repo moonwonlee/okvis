@@ -124,17 +124,11 @@ endif()
 find_package(Glog REQUIRED)
 include_directories(BEFORE ${GLOG_INCLUDE_DIRS}) 
 
-find_package(DBoW2 REQUIRED)
-IF(DBoW2_FOUND)
-   MESSAGE(STATUS "Found DBoW2: ${DBoW2_INCLUDE_DIRS}")
-ENDIF(DBoW2_FOUND)
-include_directories(BEFORE ${DBoW2_INCLUDE_DIRS}) 
-
-find_package(DLib REQUIRED)
-IF(DLib_FOUND)
-   MESSAGE(STATUS "Found DLib: ${DLib_LIBRARIES}")
-ENDIF(DLib_FOUND)
-include_directories(BEFORE ${DLib_INCLUDE_DIRS}) 
+#find_package(DBoW2 REQUIRED)
+#IF(DBoW2_FOUND)
+#   MESSAGE(STATUS "Found DBoW2: ${DBoW2_INCLUDE_DIRS}")
+#ENDIF(DBoW2_FOUND)
+#include_directories(BEFORE ${DBoW2_INCLUDE_DIRS}) 
 
 
 # brisk

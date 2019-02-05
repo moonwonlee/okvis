@@ -74,7 +74,7 @@ Frontend::Frontend(size_t numCameras)
       briskDetectionAbsoluteThreshold_(800.0),
       briskDetectionMaximumKeypoints_(450),
       briskDescriptionRotationInvariance_(true),
-      briskDescriptionScaleInvariance_(false),
+      briskDescriptionScaleInvariance_(true),
       briskMatchingThreshold_(60.0),
       matcher_(
           std::unique_ptr<okvis::DenseMatcher>(new okvis::DenseMatcher(4))),
@@ -834,7 +834,8 @@ void Frontend::initialiseBriskFeatureDetectors() {
         std::shared_ptr<cv::DescriptorExtractor>(
             new brisk::BriskDescriptorExtractor(
                 briskDescriptionRotationInvariance_,
-                briskDescriptionScaleInvariance_)));
+                briskDescriptionScaleInvariance_, 
+                brisk::BriskDescriptorExtractor::briskV2)));
   }
   for (auto it = featureDetectorMutexes_.begin();
       it != featureDetectorMutexes_.end(); ++it) {

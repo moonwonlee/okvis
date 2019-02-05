@@ -85,8 +85,10 @@ class VioInterface {
   typedef std::function<
       void(const okvis::Time &, const okvis::MapPointVector &,
            const okvis::MapPointVector &)> LandmarksCallback;
+  //typedef std::function<
+  //    void(const okvis::Time &,const std::vector<okvis::kinematics::Transformation> &, bool)> PathCallback;
   typedef std::function<
-      void(const okvis::Time &,const std::vector<okvis::kinematics::Transformation> &, bool)> PathCallback;
+      void(const okvis::Time &, okvis::OutFrameData::Ptr)> FrameCallback;
 
   VioInterface();
   virtual ~VioInterface();
@@ -294,9 +296,14 @@ class VioInterface {
   ///        When an implementing class has an estimate, they can call:
   ///        pathCallback_( pathVector );
   ///        pathVector contains all optimized keyframe positions.
-  virtual void setPathCallback(
-      const PathCallback & pathCallback);
-
+  //virtual void setPathCallback(
+  //    const PathCallback & pathCallback);
+  /// \brief Set the PathCallback to be called every time a new keyframe is processed.
+  ///        When an implementing class has an estimate, they can call:
+  ///        pathCallback_( outFrame);
+  ///        outFrame contains information about the current processed image
+  virtual void setFrameCallback(
+      const FrameCallback & frameCallback);
 
   /**
    * \brief Set the blocking variable that indicates whether the addMeasurement() functions
@@ -321,7 +328,8 @@ class VioInterface {
   FullStateCallback fullStateCallback_; ///< Full state callback function.
   FullStateCallbackWithExtrinsics fullStateCallbackWithExtrinsics_; ///< Full state and extrinsics callback function.
   LandmarksCallback landmarksCallback_; ///< Landmarks callback function.
-  PathCallback pathCallback_; ///< Path callback function.
+  //PathCallback pathCallback_; ///< Path callback function.
+  FrameCallback frameCallback_; ///< Frame callback function.
   std::shared_ptr<std::fstream> csvImuFile_;  ///< IMU CSV file.
   std::shared_ptr<std::fstream> csvPosFile_;  ///< Position CSV File.
   std::shared_ptr<std::fstream> csvMagFile_;  ///< Magnetometer CSV File

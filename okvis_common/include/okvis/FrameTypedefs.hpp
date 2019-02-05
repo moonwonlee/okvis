@@ -45,6 +45,8 @@
 
 #include <Eigen/Core>
 #include <okvis/kinematics/Transformation.hpp>
+#include <okvis/Time.hpp>
+#include <opencv2/core/core.hpp>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -175,6 +177,7 @@ typedef std::map<uint64_t, MapPoint, std::less<uint64_t>,
 typedef std::map<uint64_t, okvis::kinematics::Transformation, std::less<uint64_t>,
     Eigen::aligned_allocator<std::pair<const uint64_t, okvis::kinematics::Transformation> > > TransformationMap;
 
+
 /// \brief For convenience to pass associations - also contains the 3d points.
 struct Observation
 {
@@ -229,6 +232,27 @@ struct Observation
   bool isInitialized;   ///< Initialisation status of landmark
 };
 typedef std::vector<Observation, Eigen::aligned_allocator<Observation> > ObservationVector;
+
+/// \brief For convenience to output information to other systems
+struct OutFrameData {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    typedef std::shared_ptr<OutFrameData> Ptr;
+    Time stamp;                          ///< Timestamp of the optimized/propagated pose.
+    kinematics::Transformation T_KS;     ///< The pose relative to the current keyframe. 
+    kinematics::Transformation T_WS;     ///< The pose relative VIO Origin.
+    //okvis::SpeedAndBias speedAndBiases;         ///< The speeds and biases.
+    //Eigen::Matrix<double, 3, 1> omega_S;        ///< The rotational speed of the sensor.
+    /// The relative transformation of the cameras to the sensor (IMU) frame
+    //std::vector<okvis::kinematics::Transformation,
+    //    Eigen::aligned_allocator<okvis::kinematics::Transformation> > vector_of_T_SCi;
+    std::vector<std::vector<cv::KeyPoint > > keypoints; 
+    std::vector<cv::Mat> descriptors;
+    std::vector<okvis::ObservationVector> observations;
+    bool is_keyframe;
+    uint64_t id;
+    uint64_t keyframe_id;
+  };
+
 
 // todo: find a better place for this
 typedef Eigen::Matrix<double, 9, 1> SpeedAndBiases;

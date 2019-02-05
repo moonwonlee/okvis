@@ -56,7 +56,7 @@
 #include <okvis/ImuFrameSynchronizer.hpp>
 #include <okvis/FrameSynchronizer.hpp>
 #include <okvis/VioVisualizer.hpp>
-#include <okvis/PoseGraph.hpp>
+//#include <okvis/PoseGraph.hpp>
 #include <okvis/timing/Timer.hpp>
 #include <okvis/threadsafe/ThreadsafeQueue.hpp>
 
@@ -102,14 +102,14 @@ class ThreadedKFVio : public VioInterface {
 
   /// \brief constructor for gmock
   ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBackendInterface& estimator,
-      okvis::MockVioFrontendInterface& frontend, std::string vocab_file_path);
+      okvis::MockVioFrontendInterface& frontend);
 
 #else
   /**
    * \brief Constructor.
    * \param parameters Parameters and settings.
    */
-  ThreadedKFVio(okvis::VioParameters& parameters, std::string vocab_file_path);
+  ThreadedKFVio(okvis::VioParameters& parameters);
 #endif
 
   /// \brief Destructor. This calls Shutdown() for all threadsafe queues and joins all threads.
@@ -379,7 +379,9 @@ class ThreadedKFVio : public VioInterface {
   /// The queue containing the actual display images
   okvis::threadsafe::ThreadSafeQueue<cv::Mat> debugImages_;
   /// The queue containing completed keyframes for pose graph processing.
-  okvis::threadsafe::ThreadSafeQueue<PoseGraph::KeyFrameData::Ptr> keyFrameData_;
+  //okvis::threadsafe::ThreadSafeQueue<PoseGraph::KeyFrameData::Ptr> keyFrameData_;
+  /// The queue containing completed frames for output.
+  okvis::threadsafe::ThreadSafeQueue<OutFrameData::Ptr> outFrameData_;
 
   /// @}
   /// @name Mutexes
@@ -413,10 +415,10 @@ class ThreadedKFVio : public VioInterface {
   /// @name Algorithm threads
   /// @{
 
-  std::thread visualizationThread_; ///< Thread running visualizationLoop().
+  //std::thread visualizationThread_; ///< Thread running visualizationLoop().
   std::thread optimizationThread_;  ///< Thread running optimizationLoop().
   std::thread publisherThread_;     ///< Thread running publisherLoop().
-  std::thread keyframeProcessorThread_; ///< Thread running keyframeProcessorLoop().
+  //std::thread keyframeProcessorThread_; ///< Thread running keyframeProcessorLoop().
 
   /// @}
   /// @name Algorithm objects.
@@ -445,8 +447,8 @@ class ThreadedKFVio : public VioInterface {
   /// Max position measurements before dropping.
   const size_t maxPositionInputQueueSize_ = 10;
 
-  bool keyframeSet_;
-  PoseGraph poseGraph_;
+  //bool keyframeSet_;
+  //PoseGraph poseGraph_;
   
 };
 

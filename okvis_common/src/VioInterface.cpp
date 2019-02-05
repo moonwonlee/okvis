@@ -100,9 +100,15 @@ void VioInterface::setLandmarksCallback(
 }
 
 // Set the pathCallback to be called every time a new keyframe is processed.
-void VioInterface::setPathCallback(
-    const PathCallback & pathCallback) {
-  pathCallback_ = pathCallback;
+//void VioInterface::setPathCallback(
+//    const PathCallback & pathCallback) {
+//  pathCallback_ = pathCallback;
+//}
+
+// Set the pathCallback to be called every time a new keyframe is processed.
+void VioInterface::setFrameCallback(
+    const FrameCallback & frameCallback) {
+  frameCallback_ = frameCallback;
 }
 
 // Set the blocking variable that indicates whether the addMeasurement() functions
