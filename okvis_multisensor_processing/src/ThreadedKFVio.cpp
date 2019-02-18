@@ -478,6 +478,7 @@ void ThreadedKFVio::matchingLoop() {
     if (keypointMeasurements_.PopBlocking(&frame) == false)
       return;
 
+
     prepareToAddStateTimer.start();
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime = frame->timestamp() + temporal_imu_data_overlap;
@@ -524,7 +525,6 @@ void ThreadedKFVio::matchingLoop() {
         addStateTimer.stop();
         continue;
       }
-
       // -- matching keypoints, initialising landmarks etc.
       okvis::kinematics::Transformation T_WS;
       estimator_.get_T_WS(frame->id(), T_WS);

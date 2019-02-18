@@ -191,7 +191,6 @@ bool Frontend::dataAssociationAndInitialization(
     if (num3dMatches <= requiredMatches) {
       LOG(WARNING) << "Tracking failure. Number of 3d2d-matches: " << num3dMatches;
     }
-
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
     *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
 
@@ -302,7 +301,7 @@ bool Frontend::doWeNeedANewKeyframe(
   }
 
   if (!isInitialized_)
-    return false;
+    return true;
 
   double overlap = 0.0;
   double ratio = 0.0;
@@ -328,7 +327,6 @@ bool Frontend::doWeNeedANewKeyframe(
         frameBMatches.push_back(cv::Point2f(keypoint[0], keypoint[1]));
       }
     }
-
     if (frameBPoints.size() < 3)
       continue;
     cv::convexHull(frameBPoints, frameBHull);
@@ -339,6 +337,7 @@ bool Frontend::doWeNeedANewKeyframe(
     // areas
     double frameBArea = cv::contourArea(frameBHull);
     double frameBMatchesArea = cv::contourArea(frameBMatchesHull);
+
 
     // overlap area
     double overlapArea = frameBMatchesArea / frameBArea;
