@@ -62,7 +62,6 @@
 #include <okvis/ThreadedKFVio.hpp>
 
 #include <boost/filesystem.hpp>
-#include "time_profiler.h"
 
 class PoseViewer
 {
@@ -411,13 +410,11 @@ int main(int argc, char **argv)
   int counter = 0;
   okvis::Time start(0.0);
   while (true) {
-    PROFILE_THIS("Main Loop");
     //{
       //PROFILE_THIS("Display");
       //okvis_estimator.display();
     //}
     {
-      PROFILE_THIS("debugDisplay");
       okvis_estimator.debugDisplay();
     }
     //{
@@ -458,7 +455,6 @@ int main(int argc, char **argv)
       size_t i=min_cam;
       cv::Mat filtered;
       {
-        PROFILE_THIS("imread");
         filtered = cv::imread(
           path + "/cam" + std::to_string(i) + "/data/" + *cam_iterators.at(i),
           cv::IMREAD_GRAYSCALE);
@@ -503,7 +499,6 @@ int main(int argc, char **argv)
 
         // add the IMU measurement for (blocking) processing
         if (t_imu - start + okvis::Duration(1.0) > deltaT) {
-          PROFILE_THIS("Add IMU");
           okvis_estimator.addImuMeasurement(t_imu, acc, gyr);
         }
 
@@ -511,7 +506,6 @@ int main(int argc, char **argv)
 
       // add the image to the frontend for (blocking) processing
       if (t - start > deltaT) {
-        PROFILE_THIS("Add Image");
         okvis_estimator.addImage(t, i, filtered);
       }
 
@@ -524,7 +518,6 @@ int main(int argc, char **argv)
       std::cout << "\rProgress: "
           << int(double(counter) / double(num_camera_images) * 100) << "%  "
           << std::flush;
-      ProfileManager::printResults();
     }
 
   }

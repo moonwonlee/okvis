@@ -47,6 +47,7 @@
 #include <okvis/kinematics/Transformation.hpp>
 #include <okvis/Time.hpp>
 #include <opencv2/core/core.hpp>
+#include <memory>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {

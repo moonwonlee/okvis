@@ -89,13 +89,6 @@ include_directories($ENV{EIGEN_INCLUDE_DIR})
 SET( EIGEN_INCLUDE_DIRS "$ENV{EIGEN_INCLUDE_DIR}" )
 SET( EIGEN_INCLUDE_DIR "$ENV{EIGEN_INCLUDE_DIR}" )
 
-#Add Time Profiler
-find_package( time_profiler REQUIRED ) 
-IF(time_profiler_FOUND)
-   MESSAGE(STATUS "Found time_profiler: ${TIME_PROFILER_INCLUDE_DIRS}")
-ENDIF(time_profiler_FOUND)
-include_directories(BEFORE ${TIME_PROFILER_INCLUDE_DIRS}) 
-
 find_package(OpenMP)
 if (OPENMP_FOUND)
    message(STATUS "OpenMP found")
