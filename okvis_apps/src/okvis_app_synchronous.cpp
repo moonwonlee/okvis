@@ -333,7 +333,7 @@ int main(int argc, char **argv)
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
 
-  okvis::ThreadedKFVio okvis_estimator(parameters, "ORBvoc.yml");
+  okvis::ThreadedKFVio okvis_estimator(parameters); //, "ORBvoc.yml");
 
   PoseViewer poseViewer;
   okvis_estimator.setFullStateCallback(
@@ -410,9 +410,17 @@ int main(int argc, char **argv)
   int counter = 0;
   okvis::Time start(0.0);
   while (true) {
-    okvis_estimator.display();
-    okvis_estimator.debugDisplay();
-    poseViewer.display();
+    //{
+      //PROFILE_THIS("Display");
+      //okvis_estimator.display();
+    //}
+    {
+      okvis_estimator.debugDisplay();
+    }
+    //{
+    //  PROFILE_THIS("PoseViewer");
+      //poseViewer.display();
+    //}
 
     // check if at the end
     for (size_t i = 0; i < numCameras; ++i) {
@@ -445,9 +453,12 @@ int main(int argc, char **argv)
 
     {
       size_t i=min_cam;
-      cv::Mat filtered = cv::imread(
+      cv::Mat filtered;
+      {
+        filtered = cv::imread(
           path + "/cam" + std::to_string(i) + "/data/" + *cam_iterators.at(i),
           cv::IMREAD_GRAYSCALE);
+      }
       std::string nanoseconds = cam_iterators.at(i)->substr(
           cam_iterators.at(i)->size() - 13, 9);
       std::string seconds = cam_iterators.at(i)->substr(

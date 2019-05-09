@@ -55,7 +55,7 @@ static const okvis::Duration temporal_imu_data_overlap(0.02);  // overlap of imu
 #ifdef USE_MOCK
 // Constructor for gmock.
 ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBackendInterface& estimator,
-    okvis::MockVioFrontendInterface& frontend, std::string vocab_file_path)
+    okvis::MockVioFrontendInterface& frontend)
     : speedAndBiases_propagated_(okvis::SpeedAndBias::Zero()),
       imu_params_(parameters.imu),
       repropagationNeeded_(false),
@@ -65,14 +65,15 @@ ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters, okvis::MockVioBac
       estimator_(estimator),
       frontend_(frontend),
       parameters_(parameters),
-      maxImuInputQueueSize_(60),
-      keyframeSet_(false),
-      poseGraph_(vocab_file_path, parameters) {
+      maxImuInputQueueSize_(60)
+      //keyframeSet_(false)
+      //poseGraph_(vocab_file_path, parameters) 
+      {
   init();
 }
 #else
 // Constructor.
-ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters,std::string vocab_file_path)
+ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters)
     : speedAndBiases_propagated_(okvis::SpeedAndBias::Zero()),
       imu_params_(parameters.imu),
       repropagationNeeded_(false),
@@ -84,9 +85,10 @@ ThreadedKFVio::ThreadedKFVio(okvis::VioParameters& parameters,std::string vocab_
       parameters_(parameters),
       maxImuInputQueueSize_(
           2 * max_camera_input_queue_size * parameters.imu.rate
-              / parameters.sensors_information.cameraRate), 
-      keyframeSet_(false),
-      poseGraph_(vocab_file_path, parameters) {
+              / parameters.sensors_information.cameraRate)
+      //keyframeSet_(false),
+      //poseGraph_(vocab_file_path, parameters) 
+      {
   setBlocking(false);
   init();
 }
@@ -147,9 +149,9 @@ void ThreadedKFVio::startThreads() {
       &ThreadedKFVio::differentialConsumerLoop, this);
 
   // algorithm threads
-  visualizationThread_ = std::thread(&ThreadedKFVio::visualizationLoop, this);
+  //visualizationThread_ = std::thread(&ThreadedKFVio::visualizationLoop, this);
   optimizationThread_ = std::thread(&ThreadedKFVio::optimizationLoop, this);
-  keyframeProcessorThread_ = std::thread(&ThreadedKFVio::keyframeProcessorLoop, this);
+  //keyframeProcessorThread_ = std::thread(&ThreadedKFVio::keyframeProcessorLoop, this); 
   publisherThread_ = std::thread(&ThreadedKFVio::publisherLoop, this);
 }
 
@@ -165,7 +167,7 @@ ThreadedKFVio::~ThreadedKFVio() {
   visualizationData_.Shutdown();
   imuFrameSynchronizer_.shutdown();
   positionMeasurementsReceived_.Shutdown();
-  keyFrameData_.Shutdown();
+  //keyFrameData_.Shutdown();
 
   // consumer threads
   for (size_t i = 0; i < numCameras_; ++i) {
@@ -179,9 +181,9 @@ ThreadedKFVio::~ThreadedKFVio() {
   gpsConsumerThread_.join();
   magnetometerConsumerThread_.join();
   differentialConsumerThread_.join();
-  visualizationThread_.join();
+  //visualizationThread_.join();
   optimizationThread_.join();
-  keyframeProcessorThread_.join();
+  //keyframeProcessorThread_.join();
   publisherThread_.join();
 
   /*okvis::kinematics::Transformation endPosition;
@@ -476,6 +478,7 @@ void ThreadedKFVio::matchingLoop() {
     if (keypointMeasurements_.PopBlocking(&frame) == false)
       return;
 
+
     prepareToAddStateTimer.start();
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime = frame->timestamp() + temporal_imu_data_overlap;
@@ -522,7 +525,6 @@ void ThreadedKFVio::matchingLoop() {
         addStateTimer.stop();
         continue;
       }
-
       // -- matching keypoints, initialising landmarks etc.
       okvis::kinematics::Transformation T_WS;
       estimator_.get_T_WS(frame->id(), T_WS);
@@ -539,7 +541,7 @@ void ThreadedKFVio::matchingLoop() {
         //may need to increase queue size  
 
         //need to add current landmark positions to frame
-        if(keyframeSet_){
+        /*if(keyframeSet_){
           PoseGraph::KeyFrameData::Ptr keyFrameDataPtr = PoseGraph::KeyFrameData::Ptr(
               new PoseGraph::KeyFrameData());
           keyFrameDataPtr->keyFrames = estimator_.multiFrame(
@@ -577,7 +579,7 @@ void ThreadedKFVio::matchingLoop() {
             poseGraph_.lastKeyframeT_SoW = lastT_SW;
         } else{
           keyframeSet_=true;
-        }
+        }*/
         estimator_.setKeyframe(frame->id(), asKeyframe);
       } 
       if(!blocking_) {
@@ -685,7 +687,7 @@ void ThreadedKFVio::differentialConsumerLoop() {
 }
 
 // Loop that visualizes completed frames.
-void ThreadedKFVio::visualizationLoop() {
+/*void ThreadedKFVio::visualizationLoop() {
   okvis::VioVisualizer visualizer_(parameters_);
   for (;;) {
     VioVisualizer::VisualizationData::Ptr new_data;
@@ -698,7 +700,7 @@ void ThreadedKFVio::visualizationLoop() {
     }
 	displayImages_.PushNonBlockingDroppingIfFull(out_images,1);
   }
-}
+}*/
 
 // trigger display (needed because OSX won't allow threaded display)
 void ThreadedKFVio::display() {
@@ -863,7 +865,7 @@ void ThreadedKFVio::optimizationLoop() {
         repropagationNeeded_ = true;
       }
 
-      if (parameters_.visualization.displayImages) {
+/*      if (parameters_.visualization.displayImages) {
         // fill in information that requires access to estimator.
         visualizationDataPtr = VioVisualizer::VisualizationData::Ptr(
             new VioVisualizer::VisualizationData());
@@ -898,7 +900,66 @@ void ThreadedKFVio::optimizationLoop() {
             estimator_.currentKeyframeId());
         estimator_.get_T_WS(estimator_.currentKeyframeId(),
                             visualizationDataPtr->T_WS_keyFrame);
+      }*/
+
+      // create output frame
+      OutFrameData::Ptr outFrameDataPtr = OutFrameData::Ptr(
+          new OutFrameData());
+      // add basic info
+      outFrameDataPtr->id = frame_pairs->id();
+      outFrameDataPtr->keyframe_id = estimator_.currentKeyframeId();
+      outFrameDataPtr->is_keyframe = estimator_.isKeyframe(outFrameDataPtr->id);
+
+      //add additional keyframe data if frame is keyframe
+      if(outFrameDataPtr->is_keyframe){
+        // add extracted feature info
+        outFrameDataPtr->keypoints.resize(frame_pairs->numFrames());
+        outFrameDataPtr->descriptors.resize(frame_pairs->numFrames());
+        for(size_t camIndex = 0; camIndex < frame_pairs->numFrames();
+            ++camIndex) {
+          outFrameDataPtr->keypoints[camIndex].resize(frame_pairs->numKeypoints(camIndex));
+          for (size_t k = 0; k < frame_pairs->numKeypoints(camIndex); ++k) {
+            frame_pairs->getCvKeypoint(camIndex, k, outFrameDataPtr->keypoints[camIndex][k]);
+          }
+          //TODO: replace this with a function to get descriptors
+          outFrameDataPtr->descriptors[camIndex] =frame_pairs->frames_[camIndex].descriptors_.clone();
+        }
+
+        // add observations
+        outFrameDataPtr->observations;//.resize(frame_pairs->numKeypoints());
+        okvis::MapPoint landmark;
+        outFrameDataPtr->observations.resize(frame_pairs->numFrames());
+        for (size_t camIndex = 0; camIndex < frame_pairs->numFrames();
+            ++camIndex) {
+          outFrameDataPtr->observations[camIndex].resize(frame_pairs->numKeypoints(camIndex));
+          for (size_t k = 0; k < frame_pairs->numKeypoints(camIndex); ++k) {
+            outFrameDataPtr->observations[camIndex][k].keypointIdx = k;
+            frame_pairs->getKeypoint(camIndex, k, outFrameDataPtr->observations[camIndex][k].keypointMeasurement);
+            frame_pairs->getKeypointSize(camIndex, k, outFrameDataPtr->observations[camIndex][k].keypointSize);
+            outFrameDataPtr->observations[camIndex][k].cameraIdx = camIndex;
+            outFrameDataPtr->observations[camIndex][k].frameId = frame_pairs->id();
+            outFrameDataPtr->observations[camIndex][k].landmarkId = frame_pairs->landmarkId(camIndex, k);
+            if (estimator_.isLandmarkAdded(outFrameDataPtr->observations[camIndex][k].landmarkId)) {
+              estimator_.getLandmark(outFrameDataPtr->observations[camIndex][k].landmarkId, landmark);
+              outFrameDataPtr->observations[camIndex][k].landmark_W = landmark.point;
+              if (estimator_.isLandmarkInitialized(outFrameDataPtr->observations[camIndex][k].landmarkId))
+                outFrameDataPtr->observations[camIndex][k].isInitialized = true;
+              else
+                outFrameDataPtr->observations[camIndex][k].isInitialized = false;
+            } else {
+              outFrameDataPtr->observations[camIndex][k].landmark_W = Eigen::Vector4d(0, 0, 0, 0);  // set to infinity to tell visualizer that landmark is not added
+            }
+          }
+        }
       }
+      //Add transforms
+      estimator_.get_T_WS(outFrameDataPtr->id,
+                          outFrameDataPtr->T_WS);
+      okvis::kinematics::Transformation T_WS_keyframe;
+      estimator_.get_T_WS(outFrameDataPtr->keyframe_id,
+                          T_WS_keyframe);
+      outFrameDataPtr->T_KS = T_WS_keyframe.inverse()*outFrameDataPtr->T_WS;
+      outFrameData_.Push(outFrameDataPtr);
 
       optimizationDone_ = true;
     }  // unlock mutex
@@ -915,17 +976,17 @@ void ThreadedKFVio::optimizationLoop() {
     optimizationResults_.Push(result);
 
     // adding further elements to visualization data that do not access estimator
-    if (parameters_.visualization.displayImages) {
+    /*if (parameters_.visualization.displayImages) {
       visualizationDataPtr->currentFrames = frame_pairs;
       visualizationData_.PushNonBlockingDroppingIfFull(visualizationDataPtr, 1);
-    }
+    }*/
     afterOptimizationTimer.stop();
   }
 }
 
 // Loop that publishes the keyframes after leaving the optimization window
 // Will probably change this to do the actual pose graph processing at some point
-void ThreadedKFVio::keyframeProcessorLoop() {
+/*void ThreadedKFVio::keyframeProcessorLoop() {
   for(;;) {
     //Wait for new keyframe
     PoseGraph::KeyFrameData::Ptr newKeyframe;
@@ -944,16 +1005,22 @@ void ThreadedKFVio::keyframeProcessorLoop() {
 
    
   }
-}
+}*/
 
 // Loop that publishes the newest state and landmarks.
 void ThreadedKFVio::publisherLoop() {
   for (;;) {
     // get the result data
     OptimizationResults result;
+    OutFrameData::Ptr outFrameDataPtr;
     if (optimizationResults_.PopBlocking(&result) == false)
       return;
-
+    //Since we push outFrameData before optimization, this should never be false
+    if (outFrameData_.PopBlocking(&outFrameDataPtr) == false){
+      //TODO: change to proper error logging
+      std::cout << "MAJOR ERROR\n"; 
+      return;
+    }
     // call all user callbacks
     if (stateCallback_ && !result.onlyPublishLandmarks)
       stateCallback_(result.stamp, result.T_WS);
@@ -967,6 +1034,8 @@ void ThreadedKFVio::publisherLoop() {
     if (landmarksCallback_ && !result.landmarksVector.empty())
       landmarksCallback_(result.stamp, result.landmarksVector,
                          result.transferredLandmarks);  //TODO(gohlp): why two maps?
+    if (frameCallback_ && !result.onlyPublishLandmarks)
+      frameCallback_(result.stamp, outFrameDataPtr);
   }
 }
 

@@ -256,7 +256,7 @@ class ThreadSafeQueue {
       //gettimeofday(&tv, NULL);
       //ts.tv_sec = tv.tv_sec;
       //ts.tv_nsec = tv.tv_usec * 1e3 + timeout_nanoseconds;
-      condition_empty_.wait_for(lck, std::chrono::ns(timeout_nanoseconds));
+      condition_empty_.wait_for(lck, std::chrono::nanoseconds(timeout_nanoseconds));
     }
     if (queue_.empty()) {
       return false;

@@ -34,7 +34,7 @@
 #include "Eigen/Core"
 #include "ceres/autodiff_cost_function.h"
 
-#include "types.h"
+#include "types.hpp"
 
 namespace okvis {
 

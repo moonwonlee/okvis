@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.5)
+cmake_policy(VERSION 3.5)
 
 project(okvis)
 # The version number.
@@ -88,6 +89,12 @@ include_directories($ENV{EIGEN_INCLUDE_DIR})
 SET( EIGEN_INCLUDE_DIRS "$ENV{EIGEN_INCLUDE_DIR}" )
 SET( EIGEN_INCLUDE_DIR "$ENV{EIGEN_INCLUDE_DIR}" )
 
+find_package(OpenMP)
+if (OPENMP_FOUND)
+   message(STATUS "OpenMP found")
+   add_definitions(-DUSE_OPENMP)
+   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 # libvisensor
 find_package(VISensor)
@@ -110,17 +117,11 @@ endif()
 find_package(Glog REQUIRED)
 include_directories(BEFORE ${GLOG_INCLUDE_DIRS}) 
 
-find_package(DBoW2 REQUIRED)
-IF(DBoW2_FOUND)
-   MESSAGE(STATUS "Found DBoW2: ${DBoW2_INCLUDE_DIRS}")
-ENDIF(DBoW2_FOUND)
-include_directories(BEFORE ${DBoW2_INCLUDE_DIRS}) 
-
-find_package(DLib REQUIRED)
-IF(DLib_FOUND)
-   MESSAGE(STATUS "Found DLib: ${DLib_LIBRARIES}")
-ENDIF(DLib_FOUND)
-include_directories(BEFORE ${DLib_INCLUDE_DIRS}) 
+#find_package(DBoW2 REQUIRED)
+#IF(DBoW2_FOUND)
+#   MESSAGE(STATUS "Found DBoW2: ${DBoW2_INCLUDE_DIRS}")
+#ENDIF(DBoW2_FOUND)
+#include_directories(BEFORE ${DBoW2_INCLUDE_DIRS}) 
 
 
 # brisk
@@ -363,6 +364,7 @@ if(BUILD_APPS)
     okvis_frontend 
     okvis_multisensor_processing
     ${Boost_LIBRARIES}
+    ${TIME_PROFILER_LIBRARIES}
     ${OPENGV_LIBS}
     #C:/Boost/lib/libboost_date_time-vc120-mt-gd-1_55.lib
     #${BRISK_LIBRARIES}

@@ -187,13 +187,15 @@ class Frame
   /// \return The number of keypoints.
   inline size_t numKeypoints() const;
 
+  
+  cv::Mat descriptors_;  ///< we store the descriptors using OpenCV's matrices
+
  protected:
   cv::Mat image_;  ///< the image as OpenCV's matrix
   std::shared_ptr<const cameras::CameraBase> cameraGeometry_;  ///< the camera geometry
   std::shared_ptr<cv::FeatureDetector> detector_;  ///< the detector
   std::shared_ptr<cv::DescriptorExtractor> extractor_;  ///< the extractor
   std::vector<cv::KeyPoint> keypoints_;  ///< we store keypoints using OpenCV's struct
-  cv::Mat descriptors_;  ///< we store the descriptors using OpenCV's matrices
   std::vector<uint64_t> landmarkIds_;  ///< landmark Id, if associated -- 0 otherwise
 };
 
