@@ -153,7 +153,6 @@ bool Estimator::addStates(
     }
   }
 
-
   // create a states object:
   States states(asKeyframe, multiFrame->id(), multiFrame->timestamp());
 

@@ -517,6 +517,31 @@ void ThreadedKFVio::matchingLoop() {
       addStateTimer.start();
       okvis::Time t0Matching = okvis::Time::now();
       bool asKeyframe = false;
+
+      // threshold the number of keypoints for the frame to be valid
+      static double prev_t_s = 0;
+      const double TOLERANCE = 0;
+      // TODO: add an appropriate threshold/tolerance for the absense of features?
+      if (frame->numKeypoints() < 15) {
+        // TODO: soft-initialize the estimator 
+        if (prev_t_s > 0 && frame->timestamp().toSec() - prev_t_s > TOLERANCE) {
+          (&estimator_)->~Estimator();
+          new (&estimator_) Estimator();
+          estimator_.addImu(parameters_.imu);
+          for (size_t i = 0; i < numCameras_; ++i) {
+            // parameters_.camera_extrinsics is never set (default 0's)...
+            // do they ever change?
+            estimator_.addCamera(parameters_.camera_extrinsics);
+            cameraMeasurementsReceived_.emplace_back(
+                  std::shared_ptr<threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> > >
+                  (new threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> >()));
+          } 
+        } 
+        continue;
+      } else {
+        prev_t_s = 0;
+      }
+
       if (estimator_.addStates(frame, imuData, asKeyframe)) {
         lastAddedStateTimestamp_ = frame->timestamp();
         addStateTimer.stop();
@@ -910,10 +935,10 @@ void ThreadedKFVio::optimizationLoop() {
       outFrameDataPtr->keyframe_id = estimator_.currentKeyframeId();
       outFrameDataPtr->is_keyframe = estimator_.isKeyframe(outFrameDataPtr->id);
 
-      //add additional keyframe data if frame is keyframe
+      //add additional keyframe data if frame is keyframe (but always resize)
+      outFrameDataPtr->keypoints.resize(frame_pairs->numFrames());
       if(outFrameDataPtr->is_keyframe){
         // add extracted feature info
-        outFrameDataPtr->keypoints.resize(frame_pairs->numFrames());
         outFrameDataPtr->descriptors.resize(frame_pairs->numFrames());
         for(size_t camIndex = 0; camIndex < frame_pairs->numFrames();
             ++camIndex) {
