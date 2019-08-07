@@ -241,7 +241,7 @@ struct OutFrameData {
     Time stamp;                          ///< Timestamp of the optimized/propagated pose.
     kinematics::Transformation T_KS;     ///< The pose relative to the current keyframe. 
     kinematics::Transformation T_WS;     ///< The pose relative VIO Origin.
-    //okvis::SpeedAndBias speedAndBiases;         ///< The speeds and biases.
+    Eigen::Matrix<double, 9, 1> speedAndBiases;         ///< The speeds and biases.
     //Eigen::Matrix<double, 3, 1> omega_S;        ///< The rotational speed of the sensor.
     /// The relative transformation of the cameras to the sensor (IMU) frame
     //std::vector<okvis::kinematics::Transformation,
