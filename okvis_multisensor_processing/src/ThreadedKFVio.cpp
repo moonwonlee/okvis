@@ -521,10 +521,14 @@ void ThreadedKFVio::matchingLoop() {
       // threshold the number of keypoints for the frame to be valid
       static double prev_t_s = -1;
       const double TOLERANCE = 2;
+      const auto featureNum = frame->numKeypoints();
+      std::cout << "Detected feature num: " << featureNum << "\n";
       // TODO: add an appropriate threshold/tolerance for the absense of features?
-      if (frame->numKeypoints() < 15) {
+      if (featureNum < 15) {
+        std::cout << "Few features\n";
         // TODO: soft-initialize the estimator 
         if (prev_t_s > 0 && (frame->timestamp().toSec() - prev_t_s > TOLERANCE)) {
+          std::cout << "Reset triggered\n";
           (&estimator_)->~Estimator();
           new (&estimator_) Estimator();
           estimator_.addImu(parameters_.imu);
@@ -535,7 +539,12 @@ void ThreadedKFVio::matchingLoop() {
             cameraMeasurementsReceived_.emplace_back(
                   std::shared_ptr<threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> > >
                   (new threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> >()));
-          } 
+          }
+          // TODO: do it in separate thread
+          if (resetCallback_) {
+            resetCallback_(frame);
+          }
+          setReset(true);
           continue;
         } else if (prev_t_s < 0) {
           prev_t_s = frame->timestamp().toSec();
@@ -543,6 +552,7 @@ void ThreadedKFVio::matchingLoop() {
         }
       } else {
         prev_t_s = -1;
+        setReset(false);
       }
 
       if (estimator_.addStates(frame, imuData, asKeyframe)) {

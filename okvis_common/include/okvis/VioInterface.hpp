@@ -89,6 +89,7 @@ class VioInterface {
   //    void(const okvis::Time &,const std::vector<okvis::kinematics::Transformation> &, bool)> PathCallback;
   typedef std::function<
       void(const okvis::Time &, okvis::OutFrameData::Ptr)> FrameCallback;
+  typedef std::function< void(okvis::MultiFramePtr)> ResetCallback;
 
   VioInterface();
   virtual ~VioInterface();
@@ -304,6 +305,13 @@ class VioInterface {
   ///        outFrame contains information about the current processed image
   virtual void setFrameCallback(
       const FrameCallback & frameCallback);
+  ///  called whenever a reset is done because of few features
+  virtual void setResetCallback(
+      const ResetCallback & resetCallback);
+
+  virtual bool isReset();
+  virtual void setReset(bool reset);
+
 
   /**
    * \brief Set the blocking variable that indicates whether the addMeasurement() functions
@@ -330,12 +338,14 @@ class VioInterface {
   LandmarksCallback landmarksCallback_; ///< Landmarks callback function.
   //PathCallback pathCallback_; ///< Path callback function.
   FrameCallback frameCallback_; ///< Frame callback function.
+  ResetCallback resetCallback_; ///< Frame callback function.
   std::shared_ptr<std::fstream> csvImuFile_;  ///< IMU CSV file.
   std::shared_ptr<std::fstream> csvPosFile_;  ///< Position CSV File.
   std::shared_ptr<std::fstream> csvMagFile_;  ///< Magnetometer CSV File
   typedef std::map<size_t, std::shared_ptr<std::fstream>> FilePtrMap;
   FilePtrMap csvTracksFiles_; ///< Tracks CSV Files.
   bool blocking_; ///< Blocking option. Whether the addMeasurement() functions should wait until proccessing is complete.
+  bool featureReset;
 };
 
 }  // namespace okvis
