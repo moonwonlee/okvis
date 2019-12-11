@@ -100,6 +100,23 @@ void VioParametersReader::readConfigFile(const std::string& filename) {
         << "numImuFrames parameter not provided. Setting to default numImuFrames=2.";
     vioParameters_.optimization.numImuFrames = 2;
   }
+  // slam resetting config
+  if (file["numKeypointsResetThreshold"].isInt()) {
+    file["numKeypointsResetThreshold"]
+        >> vioParameters_.optimization.numKeypointsResetThreshold;
+  } else {
+    LOG(WARNING)
+        << "slam resetting: numKeypointsResetThreshold not provided. Setting to default: 15.";
+    vioParameters_.optimization.numKeypointsResetThreshold = 15;
+  }
+  if (file["durationResetThreshold"].isReal()) {
+    file["durationResetThreshold"]
+        >> vioParameters_.optimization.durationResetThreshold;
+  } else {
+    LOG(WARNING)
+        << "slam resetting: durationResetThreshold not provided. Setting to default: 2.";
+    vioParameters_.optimization.durationResetThreshold = 2.0;
+  }
   // minimum ceres iterations
   if (file["ceres_options"]["minIterations"].isInt()) {
     file["ceres_options"]["minIterations"]
