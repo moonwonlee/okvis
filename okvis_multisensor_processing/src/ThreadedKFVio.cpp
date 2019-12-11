@@ -522,13 +522,13 @@ void ThreadedKFVio::matchingLoop() {
       static double prev_t_s = -1;
       const double TOLERANCE = 2;
       const auto featureNum = frame->numKeypoints();
-      std::cout << "Detected feature num: " << featureNum << "\n";
+      LOG(INFO) << "Detected feature num: " << featureNum << "\n";
       // TODO: add an appropriate threshold/tolerance for the absense of features?
       if (featureNum < 15) {
-        std::cout << "Few features\n";
+        LOG(INFO) << "Few features\n";
         // TODO: soft-initialize the estimator 
         if (prev_t_s > 0 && (frame->timestamp().toSec() - prev_t_s > TOLERANCE)) {
-          std::cout << "Reset triggered\n";
+          LOG(INFO) << "Reset triggered\n";
           (&estimator_)->~Estimator();
           new (&estimator_) Estimator();
           estimator_.addImu(parameters_.imu);
