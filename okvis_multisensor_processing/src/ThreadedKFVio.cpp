@@ -520,14 +520,15 @@ void ThreadedKFVio::matchingLoop() {
 
       // threshold the number of keypoints for the frame to be valid
       static double prev_t_s = -1;
-      const double TOLERANCE = 2;
+      const auto durationThreshold = parameters_.optimization.durationResetThreshold;
+      const auto numKeypointsThreshold = parameters_.optimization.numKeypointsResetThreshold;
       const auto featureNum = frame->numKeypoints();
       LOG(INFO) << "Detected feature num: " << featureNum << "\n";
       // TODO: add an appropriate threshold/tolerance for the absense of features?
-      if (featureNum < 15) {
+      if (featureNum < numKeypointsThreshold) {
         LOG(INFO) << "Few features\n";
         // TODO: soft-initialize the estimator 
-        if (prev_t_s > 0 && (frame->timestamp().toSec() - prev_t_s > TOLERANCE)) {
+        if (prev_t_s > 0 && (frame->timestamp().toSec() - prev_t_s > durationThreshold)) {
           LOG(INFO) << "Reset triggered\n";
           (&estimator_)->~Estimator();
           new (&estimator_) Estimator();
