@@ -18,7 +18,7 @@ option (USE_SYSTEM_BRISK
 option (USE_SYSTEM_CERES
         "Use ceres via find_package rather than downloading it as part of okvis" ON) 
 option (BUILD_APPS
-        "Builds a demo app (which requires boost)" ON) 
+        "Builds a demo app (which requires boost)" OFF) 
 option (BUILD_TESTS
         "Builds all gtests" OFF) 
 SET(N_CORES 3 CACHE STRING "Using N number of cores for parallel build")
@@ -380,7 +380,7 @@ endif()
 
 # installation is invoked in the individual modules...
 export (TARGETS 
-    okvis_app_synchronous
+    #okvis_app_synchronous
     okvis_util
     okvis_kinematics
     okvis_time

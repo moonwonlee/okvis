@@ -569,7 +569,7 @@ void ThreadedKFVio::matchingLoop() {
       estimator_.get_T_WS(frame->id(), T_WS);
       matchingTimer.start();
       frontend_.dataAssociationAndInitialization(estimator_, T_WS, parameters_,
-                                                 map_, frame, &asKeyframe);
+                                                 map_, frame, &asKeyframe, this);
       matchingTimer.stop();
 
       if (asKeyframe){
