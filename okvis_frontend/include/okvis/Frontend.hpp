@@ -109,7 +109,7 @@ class Frontend : public VioFrontendInterface {
       const okvis::VioParameters & params,
       const std::shared_ptr<okvis::MapPointVector> map,
       std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe,
-      VioInterface *vioInterface = nullptr);
+      bool *needReset);
 
   /**
    * @brief Propagates pose, speeds and biases with given IMU measurements.

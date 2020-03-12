@@ -121,7 +121,7 @@ bool Frontend::dataAssociationAndInitialization(
     const std::shared_ptr<okvis::MapPointVector> /*map*/, // TODO sleutenegger: why is this not used here?
     std::shared_ptr<okvis::MultiFrame> framesInOut,
     bool *asKeyframe,
-    VioInterface *vioInterface) {
+    bool *needReset) {
   // match new keypoints to existing landmarks/keypoints
   // initialise new landmarks (states)
   // outlier rejection by consistency check
@@ -138,13 +138,10 @@ bool Frontend::dataAssociationAndInitialization(
                       "mixed frame types are not supported yet");
   }
   int num3dMatches = 0;
-  static double prev_t_s = 0;
-  const double TOLERANCE = 0;
+  const auto requiredMatches = params.optimization.numKeypointsResetThreshold;
 
   // first frame? (did do addStates before, so 1 frame minimum in estimator)
   if (estimator.numFrames() > 1) {
-
-    int requiredMatches = 20;
 
     double uncertainMatchFraction = 0;
     bool rotationOnly = false;
@@ -190,27 +187,9 @@ bool Frontend::dataAssociationAndInitialization(
         LOG(INFO) << "Initialized!";
       }
     }
-    // std::cout << "Start checking number of 3d Matches !!!!----------------------------------------------------------------------------------" << std::endl;
     if (num3dMatches <= requiredMatches) {
-      if (prev_t_s > 0 && framesInOut->timestamp().toSec() - prev_t_s > TOLERANCE){
-          (&estimator)->~Estimator();
-          new (&estimator) Estimator();
-          estimator.addImu(params.imu);
-          for (size_t i = 0; i < params.nCameraSystem.numCameras(); ++i) {
-            estimator.addCamera(params.camera_extrinsics);
-          }
-          vioInterface->setReset(true);
-          std::cout << "Reset when meet repeated featrues-------------------------------------------------------------------------------------!" << std::endl;
-      } else if (prev_t_s < 0) {
-          prev_t_s = framesInOut->timestamp().toSec();
-          *asKeyframe = false;
-      }
-      LOG(WARNING) << "Tracking failure. Number of 3d2d-matches: " << num3dMatches;
-    } else {
-      prev_t_s = -1;
-      if (vioInterface){
-        vioInterface->setReset(false);
-      }  
+      *needReset = true;
+      LOG(INFO) << "3D matches is not enough!";
     }
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
     *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
