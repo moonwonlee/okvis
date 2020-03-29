@@ -57,6 +57,7 @@
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/VioBackendInterface.hpp>
 #include <okvis/MultiFrame.hpp>
+#include <okvis/VioInterface.hpp>
 
 class Estimator;
 
@@ -105,7 +106,8 @@ class VioFrontendInterface {
       okvis::kinematics::Transformation& T_WS_propagated,
       const okvis::VioParameters & params,
       const std::shared_ptr<okvis::MapPointVector> map,
-      std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe) = 0;
+      std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe, 
+      bool *needReset) = 0;
 
   /**
    * @brief Propagates pose, speeds and biases with given IMU measurements.
