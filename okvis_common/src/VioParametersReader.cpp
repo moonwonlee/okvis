@@ -106,16 +106,16 @@ void VioParametersReader::readConfigFile(const std::string& filename) {
         >> vioParameters_.optimization.numKeypointsResetThreshold;
   } else {
     LOG(WARNING)
-        << "slam resetting: numKeypointsResetThreshold not provided. Setting to default: 15.";
-    vioParameters_.optimization.numKeypointsResetThreshold = 15;
+        << "slam resetting: numKeypointsResetThreshold not provided. Setting to default: 10.";
+    vioParameters_.optimization.numKeypointsResetThreshold = 10;
   }
   if (file["durationResetThreshold"].isReal()) {
     file["durationResetThreshold"]
         >> vioParameters_.optimization.durationResetThreshold;
   } else {
     LOG(WARNING)
-        << "slam resetting: durationResetThreshold not provided. Setting to default: 2.";
-    vioParameters_.optimization.durationResetThreshold = 2.0;
+        << "slam resetting: durationResetThreshold not provided. Setting to default: 0.5.";
+    vioParameters_.optimization.durationResetThreshold = 0.5;
   }
   // minimum ceres iterations
   if (file["ceres_options"]["minIterations"].isInt()) {
