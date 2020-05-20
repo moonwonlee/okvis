@@ -243,6 +243,8 @@ struct Optimization{
   int maxNoKeypoints;       ///< Restrict to a maximum of this many keypoints per image (strongest ones).
   int numKeyframes; ///< Number of keyframes.
   int numImuFrames; ///< Number of IMU frames.
+  int numKeypointsResetThreshold; ///< Keypoint number threshold for resetting SLAM (in all available frames)
+  double durationResetThreshold; ///< time threshold for resetting SLAM (in seconds)
 };
 
 /**

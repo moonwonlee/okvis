@@ -111,6 +111,19 @@ void VioInterface::setFrameCallback(
   frameCallback_ = frameCallback;
 }
 
+void VioInterface::setResetCallback(
+    const ResetCallback & resetCallback) {
+  resetCallback_ = resetCallback;
+}
+
+bool VioInterface::isReset() {
+  return featureReset;
+}
+
+void VioInterface::setReset(bool reset) {
+  featureReset = reset;
+}
+
 // Set the blocking variable that indicates whether the addMeasurement() functions
 // should return immediately (blocking=false), or only when the processing is complete.
 void VioInterface::setBlocking(bool blocking) {

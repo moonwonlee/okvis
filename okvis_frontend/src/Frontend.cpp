@@ -120,7 +120,8 @@ bool Frontend::dataAssociationAndInitialization(
     const okvis::VioParameters &params,
     const std::shared_ptr<okvis::MapPointVector> /*map*/, // TODO sleutenegger: why is this not used here?
     std::shared_ptr<okvis::MultiFrame> framesInOut,
-    bool *asKeyframe) {
+    bool *asKeyframe,
+    bool *needReset) {
   // match new keypoints to existing landmarks/keypoints
   // initialise new landmarks (states)
   // outlier rejection by consistency check
@@ -137,11 +138,10 @@ bool Frontend::dataAssociationAndInitialization(
                       "mixed frame types are not supported yet");
   }
   int num3dMatches = 0;
+  const auto requiredMatches = params.optimization.numKeypointsResetThreshold;
 
   // first frame? (did do addStates before, so 1 frame minimum in estimator)
   if (estimator.numFrames() > 1) {
-
-    int requiredMatches = 5;
 
     double uncertainMatchFraction = 0;
     bool rotationOnly = false;
@@ -187,9 +187,9 @@ bool Frontend::dataAssociationAndInitialization(
         LOG(INFO) << "Initialized!";
       }
     }
-
     if (num3dMatches <= requiredMatches) {
-      LOG(WARNING) << "Tracking failure. Number of 3d2d-matches: " << num3dMatches;
+      *needReset = true;
+      LOG(INFO) << "3D matches is not enough!";
     }
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
     *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);

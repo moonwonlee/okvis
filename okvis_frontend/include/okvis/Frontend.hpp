@@ -108,7 +108,8 @@ class Frontend : public VioFrontendInterface {
       okvis::kinematics::Transformation& T_WS_propagated,
       const okvis::VioParameters & params,
       const std::shared_ptr<okvis::MapPointVector> map,
-      std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe);
+      std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe,
+      bool *needReset);
 
   /**
    * @brief Propagates pose, speeds and biases with given IMU measurements.

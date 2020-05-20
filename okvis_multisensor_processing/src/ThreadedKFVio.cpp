@@ -517,6 +517,20 @@ void ThreadedKFVio::matchingLoop() {
       addStateTimer.start();
       okvis::Time t0Matching = okvis::Time::now();
       bool asKeyframe = false;
+      bool needResetofLackFeature = false;
+      bool needResetofLackMatching = false;
+
+      // threshold the number of keypoints for the frame to be valid
+      static double prev_t_s = -1;
+      const auto durationThreshold = parameters_.optimization.durationResetThreshold;
+      const auto numKeypointsThreshold = parameters_.optimization.numKeypointsResetThreshold;
+      const auto featureNum = frame->numKeypoints();
+      LOG(INFO) << "Detected feature num: " << featureNum << "\n";
+      if (featureNum < numKeypointsThreshold){
+        needResetofLackFeature = true;
+        LOG(INFO) << "Few features\n";
+      }
+      
       if (estimator_.addStates(frame, imuData, asKeyframe)) {
         lastAddedStateTimestamp_ = frame->timestamp();
         addStateTimer.stop();
@@ -530,7 +544,39 @@ void ThreadedKFVio::matchingLoop() {
       estimator_.get_T_WS(frame->id(), T_WS);
       matchingTimer.start();
       frontend_.dataAssociationAndInitialization(estimator_, T_WS, parameters_,
-                                                 map_, frame, &asKeyframe);
+                                                 map_, frame, &asKeyframe, &needResetofLackMatching);
+
+      // reset when necessary
+      if (needResetofLackMatching || needResetofLackFeature) {       
+        // TODO: soft-initialize the estimator 
+        if (prev_t_s > 0 && (frame->timestamp().toSec() - prev_t_s > durationThreshold)) {
+          LOG(INFO) << "Reset triggered\n";
+          (&estimator_)->~Estimator();
+          new (&estimator_) Estimator();
+          estimator_.addImu(parameters_.imu);
+          for (size_t i = 0; i < numCameras_; ++i) {
+            // parameters_.camera_extrinsics is never set (default 0's)...
+            // do they ever change?
+            estimator_.addCamera(parameters_.camera_extrinsics);
+            cameraMeasurementsReceived_.emplace_back(
+                  std::shared_ptr<threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> > >
+                  (new threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> >()));
+          }
+          // TODO: do it in separate thread
+          if (resetCallback_) {
+            resetCallback_(frame);
+          }
+          setReset(true);
+          continue;
+        } else if (prev_t_s < 0) {
+          prev_t_s = frame->timestamp().toSec();
+          asKeyframe = false;
+        }
+      } else {
+        prev_t_s = -1;
+        setReset(false);
+      }
+      
       matchingTimer.stop();
 
       if (asKeyframe){
@@ -909,22 +955,22 @@ void ThreadedKFVio::optimizationLoop() {
       outFrameDataPtr->id = frame_pairs->id();
       outFrameDataPtr->keyframe_id = estimator_.currentKeyframeId();
       outFrameDataPtr->is_keyframe = estimator_.isKeyframe(outFrameDataPtr->id);
+      outFrameDataPtr->speedAndBiases = lastOptimizedSpeedAndBiases_;
 
+      // add extracted feature info
+      outFrameDataPtr->keypoints.resize(frame_pairs->numFrames());
+      outFrameDataPtr->descriptors.resize(frame_pairs->numFrames());
+      for(size_t camIndex = 0; camIndex < frame_pairs->numFrames();
+          ++camIndex) {
+        outFrameDataPtr->keypoints[camIndex].resize(frame_pairs->numKeypoints(camIndex));
+        for (size_t k = 0; k < frame_pairs->numKeypoints(camIndex); ++k) {
+          frame_pairs->getCvKeypoint(camIndex, k, outFrameDataPtr->keypoints[camIndex][k]);
+        }
+        //TODO: replace this with a function to get descriptors
+        outFrameDataPtr->descriptors[camIndex] =frame_pairs->frames_[camIndex].descriptors_.clone();
+      }
       //add additional keyframe data if frame is keyframe
       if(outFrameDataPtr->is_keyframe){
-        // add extracted feature info
-        outFrameDataPtr->keypoints.resize(frame_pairs->numFrames());
-        outFrameDataPtr->descriptors.resize(frame_pairs->numFrames());
-        for(size_t camIndex = 0; camIndex < frame_pairs->numFrames();
-            ++camIndex) {
-          outFrameDataPtr->keypoints[camIndex].resize(frame_pairs->numKeypoints(camIndex));
-          for (size_t k = 0; k < frame_pairs->numKeypoints(camIndex); ++k) {
-            frame_pairs->getCvKeypoint(camIndex, k, outFrameDataPtr->keypoints[camIndex][k]);
-          }
-          //TODO: replace this with a function to get descriptors
-          outFrameDataPtr->descriptors[camIndex] =frame_pairs->frames_[camIndex].descriptors_.clone();
-        }
-
         // add observations
         outFrameDataPtr->observations;//.resize(frame_pairs->numKeypoints());
         okvis::MapPoint landmark;
