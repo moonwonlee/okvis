@@ -49,11 +49,12 @@ namespace okvis {
 /// detector and extractor
 Frame::Frame(const cv::Mat & image,
              std::shared_ptr<cameras::CameraBase> & cameraGeometry,
-             std::shared_ptr<cv::FeatureDetector> & detector,
+             //std::shared_ptr<cv::FeatureDetector> & detector,
+             cv::Ptr<cv::FeatureDetector> & detector,
              std::shared_ptr<cv::DescriptorExtractor> & extractor)
     : image_(image),
       cameraGeometry_(cameraGeometry),
-      detector_(detector),
+      detector_cv(detector),
       extractor_(extractor)
 {
 }
@@ -74,6 +75,12 @@ void Frame::setGeometry(std::shared_ptr<const cameras::CameraBase> cameraGeometr
 void Frame::setDetector(std::shared_ptr<cv::FeatureDetector> detector)
 {
   detector_ = detector;
+}
+
+// set the detector
+void Frame::setDetector(cv::Ptr<cv::FeatureDetector> detector)
+{
+  detector_cv = detector;
 }
 
 // set the extractor
@@ -121,7 +128,8 @@ int Frame::detect()
   // run the detector
   OKVIS_ASSERT_TRUE_DBG(Exception, detector_ != NULL,
                         "Detector not initialised!");
-  detector_->detect(image_, keypoints_);
+  
+  detector_cv->detect(image_, keypoints_);
   return keypoints_.size();
 }
 

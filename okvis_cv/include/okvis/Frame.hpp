@@ -80,7 +80,7 @@ class Frame
   /// @param[in] extractor The extractor to be used.
   inline Frame(const cv::Mat & image,
         std::shared_ptr<cameras::CameraBase> & cameraGeometry,
-        std::shared_ptr<cv::FeatureDetector> & detector,
+        cv::Ptr<cv::FeatureDetector> & detector,
         std::shared_ptr<cv::DescriptorExtractor> & extractor);
 
   /// \brief A simple destructor
@@ -99,6 +99,10 @@ class Frame
   /// \brief Set the detector
   /// @param[in] detector The detector to be used.
   inline void setDetector(std::shared_ptr<cv::FeatureDetector> detector);
+
+  /// \brief Set the detector
+  /// @param[in] detector The detector to be used.
+  inline void setDetector(cv::Ptr<cv::FeatureDetector> detector);
 
   /// \brief Set the extractor
   /// @param[in] extractor The extractor to be used.
@@ -194,6 +198,7 @@ class Frame
   cv::Mat image_;  ///< the image as OpenCV's matrix
   std::shared_ptr<const cameras::CameraBase> cameraGeometry_;  ///< the camera geometry
   std::shared_ptr<cv::FeatureDetector> detector_;  ///< the detector
+  cv::Ptr<cv::FeatureDetector> detector_cv; ///< the detector_cv // moon
   std::shared_ptr<cv::DescriptorExtractor> extractor_;  ///< the extractor
   std::vector<cv::KeyPoint> keypoints_;  ///< we store keypoints using OpenCV's struct
   std::vector<uint64_t> landmarkIds_;  ///< landmark Id, if associated -- 0 otherwise

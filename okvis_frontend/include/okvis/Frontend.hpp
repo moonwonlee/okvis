@@ -49,6 +49,7 @@
 #include <okvis/timing/Timer.hpp>
 #include <okvis/DenseMatcher.hpp>
 
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -267,7 +268,9 @@ class Frontend : public VioFrontendInterface {
    *          The vector contains one for each camera to ensure that there are no problems with parallel detection.
    * @warning Lock with featureDetectorMutexes_[cameraIndex] when using the detector.
    */
-  std::vector<std::shared_ptr<cv::FeatureDetector> > featureDetectors_;
+  //std::vector<cv::Ptr<cv::FeatureDetector> > featureDetectors_;
+   std::vector<std::shared_ptr<cv::FeatureDetector> > featureDetectors_;
+   std::vector<cv::Ptr<cv::FeatureDetector> > featureDetectors_cv;
   /**
    * @brief   feature descriptors with the current settings.
    *          The vector contains one for each camera to ensure that there are no problems with parallel detection.

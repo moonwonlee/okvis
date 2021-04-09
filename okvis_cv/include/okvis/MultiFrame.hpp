@@ -124,6 +124,12 @@ class MultiFrame
   inline void setDetector(size_t cameraIdx,
                           std::shared_ptr<cv::FeatureDetector> detector);
 
+  /// \brief Set the detector
+  /// @param[in] cameraIdx The camera index.
+  /// @param[in] detector The detector to be used.
+  inline void setDetector(size_t cameraIdx,
+                          cv::Ptr<cv::FeatureDetector> detector);
+
   /// \brief Set the extractor
   /// @param[in] cameraIdx The camera index.
   /// @param[in] extractor The extractor to be used.

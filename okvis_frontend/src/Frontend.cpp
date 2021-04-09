@@ -43,6 +43,8 @@
 #include <brisk/brisk.h>
 
 #include <opencv2/imgproc/imgproc.hpp>
+// #include <opencv2/features2d.hpp>
+// #include <opencv2/xfeatures2d.hpp>
 
 #include <glog/logging.h>
 
@@ -99,7 +101,8 @@ bool Frontend::detectAndDescribe(size_t cameraIndex,
   // check there are no keypoints here
   OKVIS_ASSERT_TRUE(Exception, keypoints == nullptr, "external keypoints currently not supported")
 
-  frameOut->setDetector(cameraIndex, featureDetectors_[cameraIndex]);
+  //frameOut->setDetector(cameraIndex, featureDetectors_[cameraIndex]);
+  frameOut->setDetector(cameraIndex, featureDetectors_cv[cameraIndex]);
   frameOut->setExtractor(cameraIndex, descriptorExtractors_[cameraIndex]);
 
   frameOut->detect(cameraIndex);
@@ -286,7 +289,7 @@ bool Frontend::propagation(const okvis::ImuMeasurementDeque & imuMeasurements,
   int measurements_propagated = okvis::ceres::ImuError::propagation(
       imuMeasurements, imuParams, T_WS_propagated, speedAndBiases, t_start,
       t_end, covariance, jacobian);
-
+  fflush(stdout);
   return measurements_propagated > 0;
 }
 
@@ -810,20 +813,21 @@ int Frontend::runRansac2d2d(okvis::Estimator& estimator,
 
 // (re)instantiates feature detectors and descriptor extractors. Used after settings changed or at startup.
 void Frontend::initialiseBriskFeatureDetectors() {
+  fflush(stdout);
   for (auto it = featureDetectorMutexes_.begin();
       it != featureDetectorMutexes_.end(); ++it) {
     (*it)->lock();
   }
   featureDetectors_.clear();
+  featureDetectors_cv.clear();
   descriptorExtractors_.clear();
-  for (size_t i = 0; i < numCameras_; ++i) {
+  for (size_t i = 0; i < numCameras_; ++i) {        
+#ifdef __ARM_NEON__
+    cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create(briskDetectionThreshold_);
+    featureDetectors_cv.push_back(detector);
+#else
     featureDetectors_.push_back(
         std::shared_ptr<cv::FeatureDetector>(
-#ifdef __ARM_NEON__
-            new cv::GridAdaptedFeatureDetector( 
-            new cv::FastFeatureDetector(briskDetectionThreshold_),
-                briskDetectionMaximumKeypoints_, 7, 4 ))); // from config file, except the 7x4...
-#else
             new brisk::ScaleSpaceFeatureDetector<brisk::HarrisScoreCalculator>(
                 briskDetectionThreshold_, briskDetectionOctaves_, 
                 briskDetectionAbsoluteThreshold_,
@@ -833,13 +837,11 @@ void Frontend::initialiseBriskFeatureDetectors() {
         std::shared_ptr<cv::DescriptorExtractor>(
             new brisk::BriskDescriptorExtractor(
                 briskDescriptionRotationInvariance_,
-                briskDescriptionScaleInvariance_, 
-                brisk::BriskDescriptorExtractor::briskV2)));
+                briskDescriptionScaleInvariance_)));
   }
   for (auto it = featureDetectorMutexes_.begin();
       it != featureDetectorMutexes_.end(); ++it) {
     (*it)->unlock();
   }
 }
-
 }  // namespace okvis
